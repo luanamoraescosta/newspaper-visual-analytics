@@ -1,0 +1,26 @@
+project:
+  type: default
+  output-dir: docs
+
+resources:
+  - dashboard_data.json
+  - clusters.json
+  - dashboard.js
+  - clusters.js
+  - dashboard_assets/**
+  - .nojekyll
+
+execute:
+  freeze: auto
+  echo: false
+  warning: false
+  message: false
+
+format:
+  dashboard:
+    theme:
+      - cosmo
+      - styles.scss
+    orientation: rows
+    scrolling: true
+    embed-resources: false

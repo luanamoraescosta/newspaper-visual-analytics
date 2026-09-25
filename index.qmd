@@ -1,0 +1,3276 @@
+---
+title: "Illustração Brasileira / Newspaper Visual Archive"
+author: "Luana Moraes Costa"
+format:
+  dashboard:
+    orientation: rows
+    scrolling: true
+    theme:
+      - cosmo
+      - styles.scss
+    nav-buttons:
+      - icon: github
+        href: https://github.com//luanamoraescosta/newspaper-visual-analytics
+resources:
+  - dashboard_data.json
+  - clusters.json
+  - dashboard.js
+  - clusters.js
+  - dashboard_assets/**
+  - .nojekyll
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{python}
+#| label: setup
+
+import html
+import json
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import plotly.io as pio
+
+from IPython.display import HTML, Markdown, display
+
+
+# ============================================================
+# PROJECT CONSTANTS
+# ============================================================
+
+ANNOTATED_IMAGES = 371
+
+DATA_PATH = Path(
+    "dashboard_data.json"
+)
+
+CLUSTERS_PATH = Path(
+    "clusters.json"
+)
+
+
+# ============================================================
+# LOAD DATA
+# ============================================================
+
+with DATA_PATH.open(
+    "r",
+    encoding="utf-8",
+) as file:
+    dashboard = json.load(file)
+
+
+if CLUSTERS_PATH.exists():
+    with CLUSTERS_PATH.open(
+        "r",
+        encoding="utf-8",
+    ) as file:
+        cluster_data = json.load(file)
+else:
+    cluster_data = {}
+
+
+summary = dashboard.get(
+    "summary",
+    {},
+)
+
+pages = pd.DataFrame(
+    dashboard.get(
+        "pages",
+        [],
+    )
+)
+
+detections = pd.DataFrame(
+    dashboard.get(
+        "spatial_detections",
+        [],
+    )
+)
+
+gallery_items = dashboard.get(
+    "gallery",
+    [],
+)
+
+metadata_quality = pd.DataFrame(
+    dashboard
+    .get("metadata", {})
+    .get("quality", [])
+)
+
+training = pd.DataFrame(
+    dashboard
+    .get("training", {})
+    .get("history", [])
+)
+
+training_manifest = (
+    dashboard
+    .get("training", {})
+    .get("manifest", {})
+)
+
+inference_manifest = (
+    dashboard
+    .get("inference", {})
+    .get("manifest", {})
+)
+
+diagnostics = (
+    dashboard
+    .get("training", {})
+    .get("diagnostics", {})
+)
+
+cluster_summary = cluster_data.get(
+    "summary",
+    {},
+)
+
+cluster_method = cluster_data.get(
+    "method",
+    {},
+)
+
+
+# ============================================================
+# DATA TYPES
+# ============================================================
+
+if not detections.empty:
+    detections["confidence"] = pd.to_numeric(
+        detections.get(
+            "confidence"
+        ),
+        errors="coerce",
+    )
+
+    detections["year_numeric"] = pd.to_numeric(
+        detections.get(
+            "year"
+        ),
+        errors="coerce",
+    )
+
+    if "normalized_area" in detections.columns:
+        detections["normalized_area"] = pd.to_numeric(
+            detections[
+                "normalized_area"
+            ],
+            errors="coerce",
+        )
+
+
+if not pages.empty:
+    pages["detection_count"] = (
+        pd.to_numeric(
+            pages.get(
+                "detection_count"
+            ),
+            errors="coerce",
+        )
+        .fillna(0)
+    )
+
+    pages["year_numeric"] = pd.to_numeric(
+        pages.get(
+            "year"
+        ),
+        errors="coerce",
+    )
+
+    if "has_detection" in pages.columns:
+        pages["has_detection"] = (
+            pages["has_detection"]
+            .fillna(False)
+            .astype(bool)
+        )
+    else:
+        pages["has_detection"] = (
+            pages[
+                "detection_count"
+            ] > 0
+        )
+
+
+if not metadata_quality.empty:
+    metadata_quality[
+        "missing_percent"
+    ] = (
+        pd.to_numeric(
+            metadata_quality.get(
+                "missing_percent"
+            ),
+            errors="coerce",
+        )
+        .fillna(0)
+        .clip(
+            lower=0,
+            upper=100,
+        )
+    )
+
+    metadata_quality[
+        "present_percent"
+    ] = (
+        100
+        - metadata_quality[
+            "missing_percent"
+        ]
+    )
+
+
+if not training.empty:
+    if "epoch" in training.columns:
+        training["epoch"] = pd.to_numeric(
+            training["epoch"],
+            errors="coerce",
+        )
+
+    for column in training.columns:
+        if column != "epoch":
+            training[column] = pd.to_numeric(
+                training[column],
+                errors="coerce",
+            )
+
+
+# ============================================================
+# GENERAL SUMMARY
+# ============================================================
+
+processed_pages = int(
+    summary.get(
+        "processed_pages",
+        0,
+    )
+)
+
+pages_with_detections = int(
+    summary.get(
+        "pages_with_detections",
+        0,
+    )
+)
+
+pages_without_detections = int(
+    summary.get(
+        "pages_without_detections",
+        0,
+    )
+)
+
+total_detections = int(
+    summary.get(
+        "detections",
+        0,
+    )
+)
+
+gallery_count = int(
+    summary.get(
+        "gallery_items",
+        len(gallery_items),
+    )
+)
+
+mean_confidence = float(
+    summary.get(
+        "mean_confidence",
+        0,
+    )
+)
+
+detection_rate = (
+    pages_with_detections
+    / processed_pages
+    if processed_pages
+    else 0
+)
+
+
+valid_page_years = []
+
+if (
+    not pages.empty
+    and "year_numeric" in pages.columns
+):
+    valid_page_years = (
+        pages["year_numeric"]
+        .dropna()
+        .astype(int)
+        .tolist()
+    )
+
+
+if valid_page_years:
+    archive_start_year = min(
+        valid_page_years
+    )
+
+    archive_end_year = max(
+        valid_page_years
+    )
+
+    archive_period = (
+        f"{archive_start_year}"
+        f"—{archive_end_year}"
+    )
+
+    represented_years = len(
+        set(
+            valid_page_years
+        )
+    )
+
+else:
+    archive_start_year = None
+    archive_end_year = None
+    archive_period = "Unknown"
+    represented_years = 0
+
+
+if (
+    not pages.empty
+    and "issue" in pages.columns
+):
+    valid_issues = (
+        pages["issue"]
+        .dropna()
+        .astype(str)
+    )
+
+    valid_issues = valid_issues[
+        ~valid_issues.isin(
+            [
+                "",
+                "None",
+                "nan",
+                "Unknown",
+            ]
+        )
+    ]
+
+    represented_issues = int(
+        valid_issues.nunique()
+    )
+
+else:
+    represented_issues = 0
+
+
+metadata_field_count = int(
+    len(
+        metadata_quality
+    )
+)
+
+metadata_record_count = int(
+    summary.get(
+        "metadata_records",
+        processed_pages,
+    )
+)
+
+
+# ============================================================
+# YEARLY SUMMARY
+# ============================================================
+
+if not pages.empty:
+    yearly_summary = (
+        pages
+        .dropna(
+            subset=[
+                "year_numeric"
+            ]
+        )
+        .groupby(
+            "year_numeric"
+        )
+        .agg(
+            pages=(
+                "page_id",
+                "size",
+            ),
+            pages_with_detections=(
+                "has_detection",
+                "sum",
+            ),
+            detections=(
+                "detection_count",
+                "sum",
+            ),
+        )
+        .reset_index()
+        .sort_values(
+            "year_numeric"
+        )
+    )
+
+    yearly_summary[
+        "detection_rate"
+    ] = (
+        yearly_summary[
+            "pages_with_detections"
+        ]
+        / yearly_summary[
+            "pages"
+        ]
+    )
+
+    yearly_summary[
+        "detections_per_page"
+    ] = (
+        yearly_summary[
+            "detections"
+        ]
+        / yearly_summary[
+            "pages"
+        ]
+    )
+
+else:
+    yearly_summary = pd.DataFrame()
+
+
+# ============================================================
+# HELPERS
+# ============================================================
+
+def nested_value(
+    data,
+    *keys,
+    default=None,
+):
+    current = data
+
+    for key in keys:
+        if not isinstance(
+            current,
+            dict,
+        ):
+            return default
+
+        current = current.get(
+            key
+        )
+
+        if current is None:
+            return default
+
+    return current
+
+
+def first_available(
+    *values,
+):
+    for value in values:
+        if value is not None:
+            return value
+
+    return None
+
+
+def format_metric(
+    value,
+    digits=3,
+):
+    if value is None:
+        return "N/A"
+
+    try:
+        return (
+            f"{float(value):.{digits}f}"
+        )
+    except (
+        TypeError,
+        ValueError,
+    ):
+        return str(value)
+
+
+def safe_text(
+    value,
+    fallback="Not available",
+):
+    if value is None:
+        return fallback
+
+    text = str(
+        value
+    ).strip()
+
+    if not text:
+        return fallback
+
+    return html.escape(
+        text
+    )
+
+
+def plot_config():
+    return {
+        "displaylogo": False,
+        "responsive": True,
+        "scrollZoom": False,
+        "modeBarButtonsToRemove": [
+            "lasso2d",
+            "select2d",
+            "autoScale2d",
+        ],
+    }
+
+
+def archive_plot(
+    figure,
+    height=320,
+    show_legend=False,
+):
+    """
+    Applies one compact layout and returns the figure.
+
+    All Plotly update methods are assigned back to the figure,
+    preventing Quarto/Jupyter from rendering intermediate states.
+    """
+    figure = figure.update_layout(
+        height=height,
+        autosize=True,
+        showlegend=show_legend,
+        paper_bgcolor="#f1eee6",
+        plot_bgcolor="#f1eee6",
+        margin={
+            "l": 64,
+            "r": 28,
+            "t": 24,
+            "b": (
+                92
+                if show_legend
+                else 58
+            ),
+        },
+        font={
+            "family": (
+                "Space Mono, "
+                "Courier New, monospace"
+            ),
+            "color": "#181818",
+            "size": 10,
+        },
+        hoverlabel={
+            "bgcolor": "#181818",
+            "bordercolor": "#181818",
+            "font": {
+                "family": (
+                    "Space Mono, "
+                    "Courier New, monospace"
+                ),
+                "color": "#fffdf7",
+                "size": 10,
+            },
+        },
+    )
+
+    figure = figure.update_xaxes(
+        showgrid=False,
+        showline=True,
+        linecolor="#181818",
+        linewidth=1,
+        ticks="outside",
+        tickcolor="#181818",
+        zeroline=False,
+        automargin=True,
+    )
+
+    figure = figure.update_yaxes(
+        showgrid=False,
+        showline=True,
+        linecolor="#181818",
+        linewidth=1,
+        ticks="outside",
+        tickcolor="#181818",
+        zeroline=False,
+        automargin=True,
+    )
+
+    if show_legend:
+        figure = figure.update_layout(
+            legend={
+                "orientation": "h",
+                "yanchor": "top",
+                "y": -0.20,
+                "xanchor": "left",
+                "x": 0,
+                "font": {
+                    "size": 9,
+                },
+                "itemsizing": "constant",
+                "bgcolor": "rgba(0,0,0,0)",
+            }
+        )
+
+    return figure
+
+
+# ============================================================
+# TRAINING METRICS
+# ============================================================
+
+map50 = first_available(
+    nested_value(
+        training_manifest,
+        "validation",
+        "mAP50",
+    ),
+    training_manifest.get(
+        "mAP50_caixa"
+    ),
+)
+
+map5095 = first_available(
+    nested_value(
+        training_manifest,
+        "validation",
+        "mAP50_95",
+    ),
+    training_manifest.get(
+        "mAP50_95_caixa"
+    ),
+)
+
+precision = first_available(
+    nested_value(
+        training_manifest,
+        "validation",
+        "precision",
+    ),
+    training_manifest.get(
+        "precisao_caixa"
+    ),
+)
+
+recall = first_available(
+    nested_value(
+        training_manifest,
+        "validation",
+        "recall",
+    ),
+    training_manifest.get(
+        "recall_caixa"
+    ),
+)
+
+training_imgsz = first_available(
+    training_manifest.get(
+        "imgsz_treinamento"
+    ),
+    nested_value(
+        training_manifest,
+        "training",
+        "image_size",
+    ),
+)
+
+inference_imgsz = (
+    inference_manifest.get(
+        "imgsz"
+    )
+)
+
+confidence_threshold = (
+    inference_manifest.get(
+        "confidence_threshold"
+    )
+)
+
+iou_threshold = (
+    inference_manifest.get(
+        "iou_nms"
+    )
+)
+
+inference_device = (
+    inference_manifest.get(
+        "device"
+    )
+)
+
+model_path = first_available(
+    inference_manifest.get(
+        "model_path"
+    ),
+    training_manifest.get(
+        "pesos_melhor_modelo"
+    ),
+    nested_value(
+        training_manifest,
+        "model",
+        "best_checkpoint",
+    ),
+)
+
+model_name = first_available(
+    training_manifest.get(
+        "modelo_base"
+    ),
+    nested_value(
+        training_manifest,
+        "model",
+        "base_model",
+    ),
+    "YOLO26s",
+)
+
+best_checkpoint_name = (
+    Path(
+        str(
+            model_path
+        )
+    ).name
+    if model_path
+    else "best.pt"
+)
+
+
+# ============================================================
+# BEST EPOCH
+# ============================================================
+
+best_epoch = None
+best_epoch_score = None
+
+if (
+    not training.empty
+    and "epoch" in training.columns
+    and "metrics/mAP50-95(B)"
+    in training.columns
+):
+    valid_map = training[
+        "metrics/mAP50-95(B)"
+    ].dropna()
+
+    if not valid_map.empty:
+        best_index = valid_map.idxmax()
+
+        best_epoch = int(
+            training.loc[
+                best_index,
+                "epoch",
+            ]
+        )
+
+        best_epoch_score = float(
+            training.loc[
+                best_index,
+                "metrics/mAP50-95(B)",
+            ]
+        )
+
+
+# ============================================================
+# PLOTLY TEMPLATE
+# ============================================================
+
+archive_template = go.layout.Template(
+    layout={
+        "font": {
+            "family": (
+                "Space Mono, "
+                "Courier New, monospace"
+            ),
+            "color": "#181818",
+            "size": 10,
+        },
+        "paper_bgcolor": "#f1eee6",
+        "plot_bgcolor": "#f1eee6",
+        "colorway": [
+            "#5b14ff",
+            "#7faf98",
+            "#59afc6",
+            "#d7c93c",
+            "#c78d3d",
+        ],
+    }
+)
+
+pio.templates[
+    "archive"
+] = archive_template
+
+px.defaults.template = "archive"
+```
+
+# 01 / Archive
+
+## Row
+
+```{python}
+#| output: asis
+
+hero = f"""
+<section class="archive-hero">
+
+<div class="archive-hero-main">
+
+<div>
+
+<p class="archive-kicker">
+COLLECTION / DETECTION INDEX / 001
+</p>
+
+<h1 class="archive-title">
+A Illustração<br>
+Visual Archive
+</h1>
+
+</div>
+
+<p class="archive-description">
+A computer-assisted visual index of a digitized collection of historical newspapers from the National Library of Brazil, focusing on the periodical *Ilustração Brasileira*. The interface integrates document metadata, image detection, spatial analysis, and visual similarity to facilitate exploratory research in the digital humanities.
+</p>
+
+</div>
+
+<aside class="archive-hero-index">
+
+<div>
+
+<div class="archive-record-label">
+Temporal coverage
+</div>
+
+<div class="archive-record-number">
+{archive_period}
+</div>
+
+</div>
+
+<div>
+
+<div class="archive-record-label">
+Research record
+</div>
+
+<div class="archive-caption">
+YOLO object detection<br>
+OpenCLIP visual embeddings<br>
+UMAP + HDBSCAN indexing
+</div>
+
+</div>
+
+</aside>
+
+</section>
+"""
+
+display(
+    HTML(
+        hero
+    )
+)
+```
+
+## Row
+
+```{python}
+#| output: asis
+
+archive_metrics = [
+    {
+        "title": "Digitized pages",
+        "value": f"{processed_pages:,}",
+        "subtitle": (
+            f"{represented_years} represented years"
+        ),
+        "class_name": "purple",
+    },
+    {
+        "title": "Pages with visual content",
+        "value": f"{detection_rate:.1%}",
+        "subtitle": (
+            f"{pages_with_detections:,} pages"
+        ),
+        "class_name": "green",
+    },
+    {
+        "title": "Indexed visual elements",
+        "value": f"{total_detections:,}",
+        "subtitle": (
+            "Complete inference output"
+        ),
+        "class_name": "blue",
+    },
+    {
+        "title": "Mean model confidence",
+        "value": f"{mean_confidence:.1%}",
+        "subtitle": (
+            "Across retained detections"
+        ),
+        "class_name": "orange",
+    },
+]
+
+metrics_html = (
+    '<div class="metric-grid">'
+)
+
+for metric in archive_metrics:
+    metrics_html += f"""
+    <article
+        class="metric-card {metric['class_name']}"
+    >
+
+    <div class="metric-title">
+        {metric['title']}
+    </div>
+
+    <div class="metric-value">
+        {metric['value']}
+    </div>
+
+    <div class="metric-subtitle">
+        {metric['subtitle']}
+    </div>
+
+    </article>
+    """
+
+metrics_html += "</div>"
+
+display(
+    HTML(
+        metrics_html
+    )
+)
+```
+
+# 02 / Model & Inference
+
+## Row
+
+```{python}
+#| output: asis
+
+model_record = f"""
+<section class="model-record">
+
+<div class="model-record-title">
+
+<span class="archive-tag">
+MODEL RECORD / DET–001
+</span>
+
+<h2>
+{safe_text(model_name)}
+</h2>
+
+<p>
+Object detection for visual material in digitized historical
+newspaper pages. The fine-tuning corpus contains
+<strong>{ANNOTATED_IMAGES} manually annotated page images</strong>.
+</p>
+
+</div>
+
+<div class="model-record-data">
+
+<div class="model-record-field">
+<span class="record-label">
+Annotated images
+</span>
+<span class="record-value">
+{ANNOTATED_IMAGES}
+</span>
+</div>
+
+<div class="model-record-field">
+<span class="record-label">
+Training input
+</span>
+<span class="record-value">
+{safe_text(training_imgsz)} px
+</span>
+</div>
+
+<div class="model-record-field">
+<span class="record-label">
+Inference input
+</span>
+<span class="record-value">
+{safe_text(inference_imgsz)} px
+</span>
+</div>
+
+<div class="model-record-field">
+<span class="record-label">
+Confidence threshold
+</span>
+<span class="record-value">
+{safe_text(confidence_threshold)}
+</span>
+</div>
+
+<div class="model-record-field">
+<span class="record-label">
+NMS IoU
+</span>
+<span class="record-value">
+{safe_text(iou_threshold)}
+</span>
+</div>
+
+<div class="model-record-field">
+<span class="record-label">
+Checkpoint / device
+</span>
+<span class="record-value">
+{safe_text(best_checkpoint_name)}
+/
+{safe_text(inference_device)}
+</span>
+</div>
+
+</div>
+
+</section>
+"""
+
+display(
+    HTML(
+        model_record
+    )
+)
+```
+
+## Row
+
+```{python}
+#| output: asis
+
+model_metrics = [
+    {
+        "title": "Annotated pages",
+        "value": f"{ANNOTATED_IMAGES:,}",
+        "subtitle": (
+            "Manual training annotations"
+        ),
+        "class_name": "orange",
+    },
+    {
+        "title": "mAP @ 50",
+        "value": format_metric(
+            map50
+        ),
+        "subtitle": "Validation set",
+        "class_name": "purple",
+    },
+    {
+        "title": "mAP @ 50–95",
+        "value": format_metric(
+            map5095
+        ),
+        "subtitle": "Validation set",
+        "class_name": "green",
+    },
+    {
+        "title": "Precision",
+        "value": format_metric(
+            precision
+        ),
+        "subtitle": "Bounding boxes",
+        "class_name": "blue",
+    },
+    {
+        "title": "Recall",
+        "value": format_metric(
+            recall
+        ),
+        "subtitle": "Bounding boxes",
+        "class_name": "orange",
+    },
+]
+
+metrics_html = (
+    '<div class="metric-grid">'
+)
+
+for metric in model_metrics:
+    metrics_html += f"""
+    <article
+        class="metric-card {metric['class_name']}"
+    >
+
+    <div class="metric-title">
+        {metric['title']}
+    </div>
+
+    <div class="metric-value">
+        {metric['value']}
+    </div>
+
+    <div class="metric-subtitle">
+        {metric['subtitle']}
+    </div>
+
+    </article>
+    """
+
+metrics_html += "</div>"
+
+display(
+    HTML(
+        metrics_html
+    )
+)
+```
+
+## Row {height=390}
+
+### A / Bounding-box loss
+
+```{python}
+if (
+    not training.empty
+    and "epoch" in training.columns
+    and (
+        "train/box_loss" in training.columns
+        or "val/box_loss" in training.columns
+    )
+):
+    fig = go.Figure()
+
+    if "train/box_loss" in training.columns:
+        fig = fig.add_trace(
+            go.Scatter(
+                x=training[
+                    "epoch"
+                ],
+                y=training[
+                    "train/box_loss"
+                ],
+                mode="lines",
+                name="TRAINING",
+                line={
+                    "color": "#5b14ff",
+                    "width": 2.5,
+                },
+                hovertemplate=(
+                    "Epoch %{x}<br>"
+                    "Training loss %{y:.4f}"
+                    "<extra></extra>"
+                ),
+            )
+        )
+
+    if "val/box_loss" in training.columns:
+        fig = fig.add_trace(
+            go.Scatter(
+                x=training[
+                    "epoch"
+                ],
+                y=training[
+                    "val/box_loss"
+                ],
+                mode="lines",
+                name="VALIDATION",
+                line={
+                    "color": "#7faf98",
+                    "width": 2.5,
+                },
+                hovertemplate=(
+                    "Epoch %{x}<br>"
+                    "Validation loss %{y:.4f}"
+                    "<extra></extra>"
+                ),
+            )
+        )
+
+    fig = archive_plot(
+        fig,
+        height=315,
+        show_legend=True,
+    )
+
+    fig = fig.update_layout(
+        xaxis_title="EPOCH",
+        yaxis_title="BOUNDING-BOX LOSS",
+        hovermode="x unified",
+    )
+
+    fig.show(
+        config=plot_config()
+    )
+
+else:
+    display(
+        Markdown(
+            "Bounding-box loss history was not found."
+        )
+    )
+```
+
+### B / Validation performance
+
+```{python}
+metric_columns = {
+    "metrics/precision(B)": (
+        "PRECISION",
+        "#5b14ff",
+    ),
+    "metrics/recall(B)": (
+        "RECALL",
+        "#7faf98",
+    ),
+    "metrics/mAP50(B)": (
+        "mAP@50",
+        "#59afc6",
+    ),
+    "metrics/mAP50-95(B)": (
+        "mAP@50–95",
+        "#d7c93c",
+    ),
+}
+
+available_metrics = {
+    column: specification
+    for column, specification
+    in metric_columns.items()
+    if column in training.columns
+}
+
+if (
+    not training.empty
+    and "epoch" in training.columns
+    and available_metrics
+):
+    fig = go.Figure()
+
+    for column, (
+        label,
+        color,
+    ) in available_metrics.items():
+        fig = fig.add_trace(
+            go.Scatter(
+                x=training[
+                    "epoch"
+                ],
+                y=training[
+                    column
+                ],
+                mode="lines",
+                name=label,
+                line={
+                    "color": color,
+                    "width": 2.2,
+                },
+                hovertemplate=(
+                    "Epoch %{x}<br>"
+                    f"{label}: "
+                    "%{y:.3f}"
+                    "<extra></extra>"
+                ),
+            )
+        )
+
+    if best_epoch is not None:
+        fig = fig.add_vline(
+            x=best_epoch,
+            line_width=1,
+            line_dash="dash",
+            line_color="#181818",
+        )
+
+    fig = archive_plot(
+        fig,
+        height=315,
+        show_legend=True,
+    )
+
+    fig = fig.update_layout(
+        xaxis_title="EPOCH",
+        yaxis_title="VALIDATION SCORE",
+        hovermode="x unified",
+    )
+
+    fig = fig.update_yaxes(
+        range=[0, 1.03]
+    )
+
+    fig.show(
+        config=plot_config()
+    )
+
+else:
+    display(
+        Markdown(
+            "Validation history was not found."
+        )
+    )
+```
+
+## Row
+
+### Inference sequence
+
+```{python}
+#| output: asis
+
+steps = [
+    (
+        "01",
+        "Metadata",
+        "Read the page-level record.",
+    ),
+    (
+        "02",
+        "Page image",
+        "Load the digitized page.",
+    ),
+    (
+        "03",
+        "Detection",
+        "Predict visual bounding boxes.",
+    ),
+    (
+        "04",
+        "Filtering",
+        "Apply confidence and NMS.",
+    ),
+    (
+        "05",
+        "Extraction",
+        "Crop each detected region.",
+    ),
+    (
+        "06",
+        "Index",
+        "Write geometry and metadata.",
+    ),
+]
+
+sequence_html = (
+    '<div class="inference-sequence">'
+)
+
+for number, title, description in steps:
+    sequence_html += f"""
+    <article class="inference-step">
+
+    <div class="inference-step-number">
+        [{number}]
+    </div>
+
+    <div class="inference-step-title">
+        {title}
+    </div>
+
+    <div class="inference-step-description">
+        {description}
+    </div>
+
+    </article>
+    """
+
+sequence_html += "</div>"
+
+display(
+    HTML(
+        sequence_html
+    )
+)
+```
+
+## Row {height=440}
+
+### C / Validation predictions
+
+```{python}
+validation_prediction = (
+    diagnostics.get(
+        "val_batch0_pred.jpg"
+    )
+)
+
+validation_labels = (
+    diagnostics.get(
+        "val_batch0_labels.jpg"
+    )
+)
+
+validation_image = (
+    validation_prediction
+    or validation_labels
+)
+
+if validation_image:
+    display(
+        HTML(
+            f"""
+            <figure class="diagnostic-plate">
+
+            <figcaption class="diagnostic-plate-label">
+                VALIDATION SAMPLE /
+                MODEL PREDICTIONS
+            </figcaption>
+
+            <div class="diagnostic-image">
+
+            <img
+                src="{html.escape(validation_image)}"
+                alt="YOLO validation predictions"
+                loading="lazy"
+            />
+
+            </div>
+
+            </figure>
+            """
+        )
+    )
+
+else:
+    display(
+        Markdown(
+            "Validation preview was not found."
+        )
+    )
+```
+
+### D / Normalized confusion matrix
+
+```{python}
+matrix_path = (
+    diagnostics.get(
+        "confusion_matrix_normalized.png"
+    )
+    or diagnostics.get(
+        "confusion_matrix.png"
+    )
+)
+
+if matrix_path:
+    display(
+        HTML(
+            f"""
+            <figure class="diagnostic-plate">
+
+            <figcaption class="diagnostic-plate-label">
+                VALIDATION /
+                NORMALIZED CONFUSION MATRIX
+            </figcaption>
+
+            <div class="diagnostic-image">
+
+            <img
+                src="{html.escape(matrix_path)}"
+                alt="Normalized confusion matrix"
+                loading="lazy"
+            />
+
+            </div>
+
+            </figure>
+            """
+        )
+    )
+
+else:
+    display(
+        Markdown(
+            "Confusion matrix was not found."
+        )
+    )
+```
+
+# 03 / Spatial Analysis
+
+## Row
+
+<div class="spatial-controls">
+
+<label>
+Year
+
+<select id="heatmap-year">
+<option value="">All years</option>
+</select>
+
+</label>
+
+<select
+    id="heatmap-class"
+    hidden
+    aria-hidden="true"
+>
+<option value="">All classes</option>
+</select>
+
+<label>
+Minimum confidence
+
+<strong id="heatmap-confidence-value">
+0%
+</strong>
+
+<input
+    id="heatmap-confidence"
+    type="range"
+    min="0"
+    max="100"
+    value="0"
+/>
+
+</label>
+
+</div>
+
+## Row
+
+### Normalized page space
+
+<div class="heatmap-layout">
+
+<div class="heatmap-page-wrapper">
+
+<div class="page-silhouette">
+
+<canvas
+    id="spatial-heatmap"
+    width="540"
+    height="760"
+></canvas>
+
+</div>
+
+<div class="heatmap-legend">
+
+<span>Less frequent</span>
+
+<div class="heatmap-gradient"></div>
+
+<span>More frequent</span>
+
+</div>
+
+</div>
+
+<div class="heatmap-description">
+
+<span class="archive-tag">
+SPATIAL REGISTER / GRID 36 × 54
+</span>
+
+<h3>
+Aggregated position of visual material
+</h3>
+
+<p>
+Every newspaper page is projected onto a shared coordinate system.
+Detected regions are normalized by page width and height, allowing
+pages with different pixel dimensions to be compared.
+</p>
+
+<p>
+Color intensity indicates the proportion of selected pages in which
+a grid cell is occupied by at least one detected visual element.
+Overlapping boxes are counted only once per page and grid cell.
+</p>
+
+</div>
+
+</div>
+
+### Spatial indicators
+
+<div
+    id="spatial-metrics"
+    class="spatial-metric-grid"
+></div>
+
+<div class="method-note">
+
+**Reading the coverage value.** Mean occupied page area is the
+average proportion of normalized grid cells covered by one or more
+detections. Pages without detections remain in the denominator,
+preventing years with only a few detected pages from appearing
+artificially dense.
+
+</div>
+
+# 04 / Metadata Catalogue
+
+## Row
+
+```{python}
+#| output: asis
+
+# ============================================================
+# PREPARAÇÃO DOS DADOS DO CATÁLOGO
+# ============================================================
+
+TIMELINE_START = 1901
+TIMELINE_END = 1920
+
+
+valid_yearly = (
+    yearly_summary
+    .dropna(
+        subset=["year_numeric"]
+    )
+    .copy()
+    if not yearly_summary.empty
+    else pd.DataFrame()
+)
+
+
+if not valid_yearly.empty:
+    valid_yearly[
+        "year_numeric"
+    ] = (
+        valid_yearly[
+            "year_numeric"
+        ]
+        .astype(int)
+    )
+
+    maximum_pages = max(
+        int(
+            valid_yearly[
+                "pages"
+            ].max()
+        ),
+        1,
+    )
+
+    highest_volume_row = (
+        valid_yearly
+        .sort_values(
+            [
+                "pages",
+                "year_numeric",
+            ],
+            ascending=[
+                False,
+                True,
+            ],
+        )
+        .iloc[0]
+    )
+
+    highest_detection_row = (
+        valid_yearly
+        .sort_values(
+            [
+                "detection_rate",
+                "year_numeric",
+            ],
+            ascending=[
+                False,
+                True,
+            ],
+        )
+        .iloc[0]
+    )
+
+    median_pages = int(
+        round(
+            valid_yearly[
+                "pages"
+            ].median()
+        )
+    )
+
+    first_year = int(
+        valid_yearly[
+            "year_numeric"
+        ].min()
+    )
+
+    last_year = int(
+        valid_yearly[
+            "year_numeric"
+        ].max()
+    )
+
+    available_years = set(
+        valid_yearly[
+            "year_numeric"
+        ].tolist()
+    )
+
+    expected_years = set(
+        range(
+            first_year,
+            last_year + 1,
+        )
+    )
+
+    missing_years = sorted(
+        expected_years
+        - available_years
+    )
+
+else:
+    maximum_pages = 1
+    highest_volume_row = None
+    highest_detection_row = None
+    median_pages = 0
+    missing_years = []
+
+
+if not metadata_quality.empty:
+    overall_completeness = float(
+        metadata_quality[
+            "present_percent"
+        ].mean()
+    )
+
+    complete_fields = int(
+        (
+            metadata_quality[
+                "missing_percent"
+            ] == 0
+        ).sum()
+    )
+
+else:
+    overall_completeness = 0
+    complete_fields = 0
+
+
+highest_volume_year = (
+    int(
+        highest_volume_row[
+            "year_numeric"
+        ]
+    )
+    if highest_volume_row is not None
+    else "N/A"
+)
+
+highest_volume_pages = (
+    int(
+        highest_volume_row[
+            "pages"
+        ]
+    )
+    if highest_volume_row is not None
+    else 0
+)
+
+
+catalogue_header = f"""
+<section class="catalogue-header">
+
+<div class="catalogue-title">
+
+<span class="archive-tag">
+CATALOGUE / PAGE-LEVEL RECORDS
+</span>
+
+<h2>
+Documentary structure<br>
+{archive_period}
+</h2>
+
+<p>
+This register describes the organization of the
+digitized collection. Original catalogue fields are presented
+separately from model-derived measures such as detection counts,
+confidence and occupied page area.
+</p>
+
+</div>
+
+<aside class="catalogue-index">
+
+<div>
+
+<div class="archive-record-label">
+Page records
+</div>
+
+<div class="catalogue-index-number">
+{processed_pages:,}
+</div>
+
+</div>
+
+<div class="archive-caption">
+{represented_years} represented years<br>
+{represented_issues} represented issues<br>
+{metadata_field_count} documented fields
+</div>
+
+</aside>
+
+</section>
+"""
+
+display(
+    HTML(
+        catalogue_header
+    )
+)
+```
+
+## Row
+
+```{python}
+#| output: asis
+
+# ============================================================
+# INDICADORES PRINCIPAIS
+# ============================================================
+
+catalogue_metrics = [
+    {
+        "title": "Temporal coverage",
+        "value": archive_period,
+        "subtitle": (
+            f"{represented_years} represented years"
+        ),
+        "class_name": "purple",
+    },
+    {
+        "title": "Peak holdings year",
+        "value": str(
+            highest_volume_year
+        ),
+        "subtitle": (
+            f"{highest_volume_pages:,} page records"
+        ),
+        "class_name": "green",
+    },
+    {
+        "title": "Median pages / year",
+        "value": f"{median_pages:,}",
+        "subtitle": (
+            "Across represented years"
+        ),
+        "class_name": "blue",
+    },
+]
+
+metrics_html = (
+    '<div class="metric-grid">'
+)
+
+for metric in catalogue_metrics:
+    metrics_html += f"""
+    <article
+        class="metric-card {metric['class_name']}"
+    >
+
+    <div class="metric-title">
+        {metric['title']}
+    </div>
+
+    <div class="metric-value">
+        {metric['value']}
+    </div>
+
+    <div class="metric-subtitle">
+        {metric['subtitle']}
+    </div>
+
+    </article>
+    """
+
+metrics_html += "</div>"
+
+display(
+    HTML(
+        metrics_html
+    )
+)
+```
+
+## Row
+
+### A / Temporal coverage, 1901–1920
+
+```{python}
+#| output: asis
+
+# ============================================================
+# SÉRIE COMPLETA DE ANOS
+# ============================================================
+
+complete_year_range = pd.DataFrame({
+    "year": range(
+        TIMELINE_START,
+        TIMELINE_END + 1,
+    )
+})
+
+
+if not yearly_summary.empty:
+    annual_page_counts = (
+        yearly_summary[
+            [
+                "year_numeric",
+                "pages",
+            ]
+        ]
+        .rename(
+            columns={
+                "year_numeric": "year",
+            }
+        )
+        .copy()
+    )
+
+    annual_page_counts[
+        "year"
+    ] = (
+        annual_page_counts[
+            "year"
+        ]
+        .astype(int)
+    )
+
+    annual_page_counts = (
+        complete_year_range
+        .merge(
+            annual_page_counts,
+            on="year",
+            how="left",
+        )
+    )
+
+    annual_page_counts[
+        "pages"
+    ] = (
+        annual_page_counts[
+            "pages"
+        ]
+        .fillna(0)
+        .astype(int)
+    )
+
+else:
+    annual_page_counts = (
+        complete_year_range.copy()
+    )
+
+    annual_page_counts[
+        "pages"
+    ] = 0
+
+
+maximum_annual_pages = max(
+    int(
+        annual_page_counts[
+            "pages"
+        ].max()
+    ),
+    1,
+)
+
+total_pages_in_period = int(
+    annual_page_counts[
+        "pages"
+    ].sum()
+)
+
+represented_years_in_period = int(
+    (
+        annual_page_counts[
+            "pages"
+        ] > 0
+    ).sum()
+)
+
+empty_years_in_period = int(
+    (
+        annual_page_counts[
+            "pages"
+        ] == 0
+    ).sum()
+)
+
+
+peak_year_row = (
+    annual_page_counts
+    .sort_values(
+        [
+            "pages",
+            "year",
+        ],
+        ascending=[
+            False,
+            True,
+        ],
+    )
+    .iloc[0]
+)
+
+peak_year = int(
+    peak_year_row[
+        "year"
+    ]
+)
+
+peak_year_pages = int(
+    peak_year_row[
+        "pages"
+    ]
+)
+
+
+# ============================================================
+# SVG PROPORCIONAL
+# ============================================================
+
+SVG_WIDTH = 1200
+SVG_HEIGHT = 390
+
+MARGIN_LEFT = 72
+MARGIN_RIGHT = 26
+MARGIN_TOP = 48
+MARGIN_BOTTOM = 64
+
+PLOT_WIDTH = (
+    SVG_WIDTH
+    - MARGIN_LEFT
+    - MARGIN_RIGHT
+)
+
+PLOT_HEIGHT = (
+    SVG_HEIGHT
+    - MARGIN_TOP
+    - MARGIN_BOTTOM
+)
+
+BASELINE_Y = (
+    MARGIN_TOP
+    + PLOT_HEIGHT
+)
+
+year_count = len(
+    annual_page_counts
+)
+
+slot_width = (
+    PLOT_WIDTH
+    / year_count
+)
+
+bar_width = min(
+    38,
+    slot_width * 0.62,
+)
+
+
+svg_parts = [
+    f"""
+    <svg
+        class="annual-holdings-svg"
+        viewBox="0 0 {SVG_WIDTH} {SVG_HEIGHT}"
+        role="img"
+        aria-labelledby="annual-chart-title annual-chart-description"
+    >
+
+    <title id="annual-chart-title">
+        Digitized page records by year from 1901 to 1920
+    </title>
+
+    <desc id="annual-chart-description">
+        Bar height represents the number of digitized pages.
+        Years without page records remain visible without a bar.
+    </desc>
+    """
+]
+
+
+# ------------------------------------------------------------
+# Linhas horizontais e rótulos do eixo Y
+# ------------------------------------------------------------
+
+tick_fractions = [
+    0.00,
+    0.25,
+    0.50,
+    0.75,
+    1.00,
+]
+
+for fraction in tick_fractions:
+    tick_value = int(
+        round(
+            maximum_annual_pages
+            * fraction
+        )
+    )
+
+    y_position = (
+        BASELINE_Y
+        - PLOT_HEIGHT
+        * fraction
+    )
+
+    line_class = (
+        "annual-grid-line baseline"
+        if fraction == 0
+        else "annual-grid-line"
+    )
+
+    svg_parts.append(
+        f"""
+        <line
+            class="{line_class}"
+            x1="{MARGIN_LEFT}"
+            y1="{y_position:.3f}"
+            x2="{SVG_WIDTH - MARGIN_RIGHT}"
+            y2="{y_position:.3f}"
+        />
+
+        <text
+            class="annual-axis-label"
+            x="{MARGIN_LEFT - 12}"
+            y="{y_position + 4:.3f}"
+            text-anchor="end"
+        >
+            {tick_value:,}
+        </text>
+        """
+    )
+
+
+# ------------------------------------------------------------
+# Barras anuais
+# ------------------------------------------------------------
+
+for index, row in annual_page_counts.iterrows():
+    year = int(
+        row[
+            "year"
+        ]
+    )
+
+    page_count = int(
+        row[
+            "pages"
+        ]
+    )
+
+    center_x = (
+        MARGIN_LEFT
+        + slot_width
+        * index
+        + slot_width / 2
+    )
+
+    x_position = (
+        center_x
+        - bar_width / 2
+    )
+
+    if page_count > 0:
+        bar_height = (
+            page_count
+            / maximum_annual_pages
+            * PLOT_HEIGHT
+        )
+
+        bar_y = (
+            BASELINE_Y
+            - bar_height
+        )
+
+        # Mantém barras pequenas visíveis,
+        # mas sem igualar suas alturas.
+        visible_height = max(
+            bar_height,
+            2.5,
+        )
+
+        visible_y = (
+            BASELINE_Y
+            - visible_height
+        )
+
+        svg_parts.append(
+            f"""
+            <g class="annual-svg-column">
+
+            <title>
+                {year}: {page_count:,} digitized pages
+            </title>
+
+            <rect
+                class="annual-svg-bar"
+                x="{x_position:.3f}"
+                y="{visible_y:.3f}"
+                width="{bar_width:.3f}"
+                height="{visible_height:.3f}"
+            />
+
+            <text
+                class="annual-svg-value"
+                x="{center_x:.3f}"
+                y="{max(18, visible_y - 8):.3f}"
+                text-anchor="middle"
+            >
+                {page_count:,}
+            </text>
+
+            <text
+                class="annual-svg-year"
+                x="{center_x:.3f}"
+                y="{BASELINE_Y + 27:.3f}"
+                text-anchor="middle"
+            >
+                {year}
+            </text>
+
+            </g>
+            """
+        )
+
+    else:
+        svg_parts.append(
+            f"""
+            <g class="annual-svg-column annual-svg-empty">
+
+            <title>
+                {year}: no digitized page records
+            </title>
+
+            <line
+                class="annual-empty-marker"
+                x1="{x_position:.3f}"
+                y1="{BASELINE_Y - 1}"
+                x2="{x_position + bar_width:.3f}"
+                y2="{BASELINE_Y - 1}"
+            />
+
+            <text
+                class="annual-svg-zero"
+                x="{center_x:.3f}"
+                y="{BASELINE_Y - 10:.3f}"
+                text-anchor="middle"
+            >
+                —
+            </text>
+
+            <text
+                class="annual-svg-year"
+                x="{center_x:.3f}"
+                y="{BASELINE_Y + 27:.3f}"
+                text-anchor="middle"
+            >
+                {year}
+            </text>
+
+            </g>
+            """
+        )
+
+
+svg_parts.append(
+    """
+    </svg>
+    """
+)
+
+annual_svg = "".join(
+    svg_parts
+)
+
+
+timeline_html = f"""
+<section class="metadata-register annual-overview-register">
+
+<header class="metadata-register-heading">
+
+<div>
+
+<span class="metadata-register-index">
+A / TEMPORAL COVERAGE
+</span>
+
+<h3>
+Digitized page records by year, 1901–1920
+</h3>
+
+</div>
+
+<div class="metadata-register-legend">
+
+<span>
+<i class="legend-swatch holdings-swatch"></i>
+Digitized pages
+</span>
+
+<span>
+<i class="legend-swatch empty-year-swatch"></i>
+No page records
+</span>
+
+</div>
+
+</header>
+
+<div class="annual-overview-summary">
+
+<div>
+
+<span class="annual-summary-label">
+Pages in period
+</span>
+
+<strong>
+{total_pages_in_period:,}
+</strong>
+
+</div>
+
+<div>
+
+<span class="annual-summary-label">
+Represented years
+</span>
+
+<strong>
+{represented_years_in_period}
+</strong>
+
+</div>
+
+<div>
+
+<span class="annual-summary-label">
+Years without records
+</span>
+
+<strong>
+{empty_years_in_period}
+</strong>
+
+</div>
+
+<div>
+
+<span class="annual-summary-label">
+Largest annual holding
+</span>
+
+<strong>
+{peak_year} / {peak_year_pages:,}
+</strong>
+
+</div>
+
+</div>
+
+<div class="annual-svg-wrapper">
+
+{annual_svg}
+
+</div>
+
+<footer class="metadata-register-footer">
+The chart preserves the complete sequence from 1901 to 1920.
+Years without page records remain visible as empty positions.
+Bar height is proportional to the largest annual holding.
+</footer>
+
+</section>
+"""
+
+display(
+    HTML(
+        timeline_html
+    )
+)
+```
+
+## Row
+
+### B / Pages, detection activity and visual density
+
+```{python}
+#| output: asis
+
+if not valid_yearly.empty:
+    holdings_html = """
+    <section class="metadata-register">
+
+    <header class="metadata-register-heading">
+
+    <div>
+
+    <span class="metadata-register-index">
+        B / ANNUAL HOLDINGS
+    </span>
+
+    <h3>
+        Pages, detection activity and visual density
+    </h3>
+
+    </div>
+
+    <div class="metadata-register-legend">
+
+    <span>
+    <i class="legend-swatch holdings-swatch"></i>
+    Page volume
+    </span>
+
+    <span>
+    <i class="legend-swatch detection-swatch"></i>
+    Pages with visual content
+    </span>
+
+    </div>
+
+    </header>
+
+    <div class="holdings-column-headings">
+
+    <div>Year</div>
+    <div>Page volume</div>
+    <div>Pages</div>
+    <div>Visual content</div>
+    <div>Elements / page</div>
+
+    </div>
+
+    <div class="holdings-register-body">
+    """
+
+    for _, row in valid_yearly.iterrows():
+        year = int(
+            row[
+                "year_numeric"
+            ]
+        )
+
+        page_count = int(
+            row[
+                "pages"
+            ]
+        )
+
+        pages_detected = int(
+            row[
+                "pages_with_detections"
+            ]
+        )
+
+        detection_share = float(
+            row[
+                "detection_rate"
+            ]
+        )
+
+        elements_per_page = float(
+            row[
+                "detections_per_page"
+            ]
+        )
+
+        volume_width = (
+            page_count
+            / maximum_pages
+            * 100
+        )
+
+        detection_width = (
+            detection_share
+            * 100
+        )
+
+        holdings_html += f"""
+        <article class="holdings-row">
+
+        <div class="holdings-year">
+            {year}
+        </div>
+
+        <div class="holdings-volume">
+
+        <div
+            class="holdings-volume-bar"
+            style="width: {volume_width:.4f}%"
+            title="{page_count:,} digitized pages"
+        ></div>
+
+        </div>
+
+        <div class="holdings-count">
+            {page_count:,}
+        </div>
+
+        <div class="holdings-detection">
+
+        <div class="holdings-detection-track">
+
+        <div
+            class="holdings-detection-bar"
+            style="width: {detection_width:.4f}%"
+            title="{detection_share:.1%} of pages with visual content"
+        ></div>
+
+        </div>
+
+        <span>
+            {detection_share:.1%}
+
+            <small>
+                {pages_detected:,} pages
+            </small>
+        </span>
+
+        </div>
+
+        <div class="holdings-density">
+            {elements_per_page:.2f}
+        </div>
+
+        </article>
+        """
+
+    holdings_html += """
+    </div>
+
+    <footer class="metadata-register-footer">
+    Page-volume bars are normalized against the year containing
+    the largest number of page records. Detection bars always use
+    a scale from 0% to 100%.
+    </footer>
+
+    </section>
+    """
+
+    display(
+        HTML(
+            holdings_html
+        )
+    )
+
+else:
+    display(
+        Markdown(
+            "No annual holdings were found."
+        )
+    )
+```
+
+## Row
+
+
+```{python}
+#| output: asis
+
+# ============================================================
+# NOTAS DE LEITURA
+# ============================================================
+
+if missing_years:
+    missing_years_text = ", ".join(
+        str(year)
+        for year in missing_years
+    )
+else:
+    missing_years_text = (
+        "No internal gaps in the represented period."
+    )
+
+
+if highest_detection_row is not None:
+    highest_detection_year = int(
+        highest_detection_row[
+            "year_numeric"
+        ]
+    )
+
+    highest_detection_rate = float(
+        highest_detection_row[
+            "detection_rate"
+        ]
+    )
+
+    detection_note = (
+        f"{highest_detection_year} has the highest "
+        f"page-level detection rate "
+        f"({highest_detection_rate:.1%})."
+    )
+
+else:
+    detection_note = (
+        "Detection activity could not be calculated."
+    )
+
+
+notes_html = f"""
+<div class="catalogue-notes">
+
+<article class="catalogue-note">
+
+<div class="catalogue-note-title">
+Temporal gaps
+</div>
+
+<p>
+{html.escape(missing_years_text)}
+Records without a valid year are excluded from annual views.
+</p>
+
+</article>
+
+<article class="catalogue-note">
+
+<div class="catalogue-note-title">
+Detection activity
+</div>
+
+<p>
+{html.escape(detection_note)}
+This value describes model output, not a manually verified measure
+of historical illustration frequency.
+</p>
+
+</article>
+
+<article class="catalogue-note">
+
+<div class="catalogue-note-title">
+Unit of analysis
+</div>
+
+<p>
+Each source record represents one digitized newspaper page.
+Detection counts, confidence values and occupied area are
+computationally derived fields.
+</p>
+
+</article>
+
+</div>
+"""
+
+display(
+    HTML(
+        notes_html
+    )
+)
+```
+
+# 05 / Visual Similarity
+
+## Row
+
+<div
+    id="cluster-summary"
+    class="cluster-summary-grid"
+></div>
+
+## Row
+
+### OpenCLIP / UMAP map
+
+<div class="cluster-controls">
+
+<label>
+Map marks
+
+<select id="cluster-render-mode">
+<option value="points">Colored points</option>
+<option value="thumbnails">Image thumbnails</option>
+</select>
+
+</label>
+
+<label>
+Color points by
+
+<select id="cluster-color-mode">
+<option value="cluster">Visual cluster</option>
+<option value="year">Year</option>
+<option value="confidence">Confidence</option>
+</select>
+
+</label>
+
+<label>
+Filter cluster
+
+<select id="cluster-filter">
+<option value="">All clusters</option>
+</select>
+
+</label>
+
+<label>
+Filter year
+
+<select id="cluster-year-filter">
+<option value="">All years</option>
+</select>
+
+</label>
+
+<select
+    id="cluster-class-filter"
+    hidden
+    aria-hidden="true"
+>
+<option value="">All classes</option>
+</select>
+
+</div>
+
+<div
+    id="cluster-map-status"
+    class="cluster-map-status"
+></div>
+
+<div class="cluster-map-container">
+
+<svg
+    id="cluster-map"
+    viewBox="0 0 1000 650"
+    role="img"
+    aria-label="UMAP visual similarity map"
+></svg>
+
+<div
+    id="cluster-tooltip"
+    class="cluster-tooltip"
+></div>
+
+</div>
+
+<div class="method-note">
+
+Each mark represents an extracted visual element. Select
+**Colored points** to inspect cluster density or **Image
+thumbnails** to inspect visual content directly. Nearby elements
+have similar OpenCLIP image embeddings. PCA reduces the embedding
+space, HDBSCAN identifies dense groups and UMAP produces the
+two-dimensional display.
+
+</div>
+
+## Row
+
+<div class="archive-section-header">
+
+<div class="archive-section-index">
+05.2
+</div>
+
+<h2 class="archive-section-title">
+Cluster Atlas
+</h2>
+
+</div>
+
+<div class="cluster-atlas-controls">
+
+<label>
+Examples per cluster
+
+<select id="cluster-example-count">
+<option value="10">10 examples</option>
+<option value="12" selected>12 examples</option>
+<option value="20">20 examples</option>
+<option value="40">40 examples</option>
+<option value="all">All examples</option>
+</select>
+
+</label>
+
+<label class="cluster-checkbox">
+
+<input
+    id="cluster-show-noise"
+    type="checkbox"
+/>
+
+Show noise / unassigned
+
+</label>
+
+<input
+    id="cluster-representative-only"
+    type="checkbox"
+    checked
+    hidden
+    aria-hidden="true"
+/>
+
+</div>
+
+<div id="cluster-atlas-status"></div>
+
+<div
+    id="cluster-atlas"
+    class="cluster-atlas"
+></div>
+
+<div
+    id="cluster-image-modal"
+    class="gallery-modal"
+    aria-hidden="true"
+>
+
+<div class="gallery-modal-content">
+
+<button
+    id="cluster-image-modal-close"
+    aria-label="Close cluster image"
+>
+×
+</button>
+
+<div id="cluster-image-modal-body"></div>
+
+</div>
+
+</div>
+
+# 06 / Visual Explorer
+
+## Row
+
+<div class="gallery-controls">
+
+<input
+    id="gallery-search"
+    type="search"
+    value=""
+    hidden
+    aria-hidden="true"
+/>
+
+<select
+    id="gallery-class"
+    hidden
+    aria-hidden="true"
+>
+<option value="">All classes</option>
+</select>
+
+<select id="gallery-year">
+<option value="">All years</option>
+</select>
+
+<label class="range-control">
+
+Minimum confidence
+
+<strong id="gallery-confidence-value">
+0%
+</strong>
+
+<input
+    id="gallery-confidence"
+    type="range"
+    min="0"
+    max="100"
+    value="0"
+/>
+
+</label>
+
+<select id="gallery-sort">
+<option value="confidence-desc">
+Highest confidence
+</option>
+<option value="confidence-asc">
+Lowest confidence
+</option>
+<option value="year-asc">
+Oldest first
+</option>
+<option value="year-desc">
+Newest first
+</option>
+</select>
+
+</div>
+
+<div id="gallery-status"></div>
+
+<div
+    id="visual-gallery"
+    class="visual-gallery"
+></div>
+
+<div
+    id="gallery-modal"
+    class="gallery-modal"
+    aria-hidden="true"
+>
+
+<div class="gallery-modal-content">
+
+<button
+    id="gallery-modal-close"
+    aria-label="Close image record"
+>
+×
+</button>
+
+<div id="gallery-modal-body"></div>
+
+</div>
+
+</div>
+
+# 07 / Documentation
+
+## Row
+
+```{python}
+#| output: asis
+
+documentation_html = f"""
+<div class="documentation-index">
+
+<div class="documentation-number">
+01
+</div>
+
+<section class="documentation-content">
+
+<h3>Collection</h3>
+
+<p>
+The analytical unit is the digitized newspaper page. The current
+public index covers {archive_period} and connects page-level
+catalogue records to model-derived visual elements.
+</p>
+
+</section>
+
+<div class="documentation-number">
+02
+</div>
+
+<section class="documentation-content">
+
+<h3>Training corpus</h3>
+
+<p>
+The object detector was fine-tuned from
+<strong>{ANNOTATED_IMAGES} manually annotated page images</strong>.
+The annotations identify the location of visual material through
+bounding boxes.
+</p>
+
+</section>
+
+<div class="documentation-number">
+03
+</div>
+
+<section class="documentation-content">
+
+<h3>Detection model</h3>
+
+<p>
+The YOLO model predicts visual-element bounding boxes. Confidence
+filtering and non-maximum suppression are applied before each valid
+region is cropped and connected to its page-level metadata.
+</p>
+
+</section>
+
+<div class="documentation-number">
+04
+</div>
+
+<section class="documentation-content">
+
+<h3>Spatial aggregation</h3>
+
+<p>
+Bounding boxes are normalized to a common page coordinate system.
+The heatmap estimates the frequency and occupied area of detected
+visual material without repeatedly counting overlapping boxes.
+</p>
+
+</section>
+
+<div class="documentation-number">
+05
+</div>
+
+<section class="documentation-content">
+
+<h3>Visual similarity</h3>
+
+<p>
+OpenCLIP image embeddings represent the extracted regions. PCA
+reduces dimensionality, UMAP creates the interactive map and
+HDBSCAN identifies dense visual groups without forcing every image
+into a cluster.
+</p>
+
+</section>
+
+<div class="documentation-number">
+06
+</div>
+
+<section class="documentation-content">
+
+<h3>Interpretation</h3>
+
+<p>
+Confidence is not equivalent to correctness. Visual clusters are
+computational groupings rather than historical categories. Changes
+over time can also reflect scan quality, page layout and missing
+metadata.
+</p>
+
+</section>
+
+</div>
+"""
+
+display(
+    HTML(
+        documentation_html
+    )
+)
+```
+
+## Row
+
+### Reproducibility record
+
+```{python}
+#| output: asis
+
+openclip_model = (
+    cluster_method.get(
+        "embedding_model"
+    )
+)
+
+openclip_pretrained = (
+    cluster_method.get(
+        "embedding_pretrained"
+    )
+)
+
+cluster_min_confidence = (
+    cluster_method.get(
+        "minimum_yolo_confidence"
+    )
+)
+
+pca_information = (
+    cluster_method.get(
+        "pca"
+    )
+)
+
+if isinstance(
+    pca_information,
+    dict,
+):
+    pca_components = (
+        pca_information.get(
+            "components"
+        )
+    )
+else:
+    pca_components = None
+
+
+provenance_rows = [
+    (
+        "Collection period",
+        archive_period,
+    ),
+    (
+        "Manually annotated pages",
+        f"{ANNOTATED_IMAGES:,}",
+    ),
+    (
+        "Processed collection pages",
+        f"{processed_pages:,}",
+    ),
+    (
+        "Detected visual elements",
+        f"{total_detections:,}",
+    ),
+    (
+        "Training image size",
+        safe_text(
+            training_imgsz
+        ),
+    ),
+    (
+        "Inference image size",
+        safe_text(
+            inference_imgsz
+        ),
+    ),
+    (
+        "Inference confidence threshold",
+        safe_text(
+            confidence_threshold
+        ),
+    ),
+    (
+        "NMS IoU threshold",
+        safe_text(
+            iou_threshold
+        ),
+    ),
+    (
+        "Inference device",
+        safe_text(
+            inference_device
+        ),
+    ),
+    (
+        "Detection checkpoint",
+        safe_text(
+            best_checkpoint_name
+        ),
+    ),
+    (
+        "Embedding library",
+        safe_text(
+            cluster_method.get(
+                "embedding_library"
+            )
+        ),
+    ),
+    (
+        "Embedding model",
+        safe_text(
+            openclip_model
+        ),
+    ),
+    (
+        "Embedding checkpoint",
+        safe_text(
+            openclip_pretrained
+        ),
+    ),
+    (
+        "Minimum clustering confidence",
+        safe_text(
+            cluster_min_confidence
+        ),
+    ),
+    (
+        "PCA components",
+        safe_text(
+            pca_components
+        ),
+    ),
+    (
+        "HDBSCAN minimum cluster size",
+        safe_text(
+            cluster_method.get(
+                "min_cluster_size"
+            )
+        ),
+    ),
+    (
+        "HDBSCAN minimum samples",
+        safe_text(
+            cluster_method.get(
+                "min_samples"
+            )
+        ),
+    ),
+    (
+        "Clustered items",
+        f"{int(cluster_summary.get('items', 0)):,}",
+    ),
+    (
+        "Visual clusters",
+        f"{int(cluster_summary.get('cluster_count', 0)):,}",
+    ),
+]
+
+
+table_html = """
+<div class="provenance-table-wrapper">
+
+<table class="provenance-table">
+
+<thead>
+
+<tr>
+
+<th scope="col">
+Parameter
+</th>
+
+<th scope="col">
+Recorded value
+</th>
+
+</tr>
+
+</thead>
+
+<tbody>
+"""
+
+for label, value in provenance_rows:
+    table_html += f"""
+    <tr>
+
+    <td>
+        {html.escape(str(label))}
+    </td>
+
+    <td>
+        {value}
+    </td>
+
+    </tr>
+    """
+
+table_html += """
+</tbody>
+
+</table>
+
+</div>
+"""
+
+display(
+    HTML(
+        table_html
+    )
+)
+```
+
+## Row
+
+<div class="archive-note">
+
+**Publication note.** Original newspaper pages, uncompressed crops,
+model checkpoints and local filesystem paths are excluded from the
+public interface. The GitHub Pages edition contains optimized WebP
+thumbnails, compact JSON records, selected validation diagnostics
+and client-side visualizations.
+
+</div>
+
+<script src="dashboard.js"></script>
+<script src="clusters.js"></script>
