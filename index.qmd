@@ -837,7 +837,7 @@ Visual Archive
 </div>
 
 <p class="archive-description">
-A computer-assisted visual index of a digitized collection of historical newspapers from the National Library of Brazil, focusing on the periodical *Ilustração Brasileira*. The interface integrates document metadata, image detection, spatial analysis, and visual similarity to facilitate exploratory research in the digital humanities.
+A computer-assisted visual index of a digitized collection of historical newspapers from the National Library of Brazil, focusing on the periodical Ilustração Brasileira. The interface integrates document metadata, image detection, spatial analysis from the digitized images, and visual similarity to facilitate exploratory research in the digital humanities.
 </p>
 
 </div>
@@ -3226,6 +3226,81 @@ Newest first
 ```{python}
 #| output: asis
 
+# ============================================================
+# SEMANTIC SEARCH METADATA
+# ============================================================
+
+SEMANTIC_METADATA_PATH = Path(
+    "semantic_index_metadata.json"
+)
+
+if SEMANTIC_METADATA_PATH.exists():
+    with SEMANTIC_METADATA_PATH.open(
+        "r",
+        encoding="utf-8",
+    ) as file:
+        semantic_metadata = json.load(
+            file
+        )
+else:
+    semantic_metadata = {}
+
+
+semantic_model = semantic_metadata.get(
+    "model",
+    {},
+)
+
+semantic_selection = semantic_metadata.get(
+    "selection",
+    {},
+)
+
+semantic_items = semantic_metadata.get(
+    "items",
+    [],
+)
+
+semantic_family = semantic_model.get(
+    "family",
+    "OpenAI CLIP",
+)
+
+semantic_architecture = semantic_model.get(
+    "architecture",
+    "ViT-B/32",
+)
+
+semantic_python_model = semantic_model.get(
+    "python_model",
+    "openai/clip-vit-base-patch32",
+)
+
+semantic_browser_model = semantic_model.get(
+    "browser_model",
+    "Xenova/clip-vit-base-patch32",
+)
+
+semantic_dimension = semantic_model.get(
+    "dimension",
+    "Not available",
+)
+
+semantic_normalization = semantic_model.get(
+    "normalization",
+    "L2",
+)
+
+semantic_indexed_items = len(
+    semantic_items
+)
+
+semantic_min_confidence = (
+    semantic_selection.get(
+        "minimum_yolo_confidence"
+    )
+)
+
 documentation_html = f"""
 <div class="documentation-index">
 
@@ -3240,10 +3315,13 @@ documentation_html = f"""
 <p>
 The analytical unit is the digitized newspaper page. The current
 public index covers {archive_period} and connects page-level
-catalogue records to model-derived visual elements.
+catalogue records to model-derived visual elements. The public
+interface presents an optimized sample of the complete research
+collection.
 </p>
 
 </section>
+
 
 <div class="documentation-number">
 02
@@ -3262,6 +3340,7 @@ bounding boxes.
 
 </section>
 
+
 <div class="documentation-number">
 03
 </div>
@@ -3278,6 +3357,7 @@ region is cropped and connected to its page-level metadata.
 
 </section>
 
+
 <div class="documentation-number">
 04
 </div>
@@ -3290,9 +3370,12 @@ region is cropped and connected to its page-level metadata.
 Bounding boxes are normalized to a common page coordinate system.
 The heatmap estimates the frequency and occupied area of detected
 visual material without repeatedly counting overlapping boxes.
+Pages without detections remain part of the denominator when mean
+page coverage is calculated.
 </p>
 
 </section>
+
 
 <div class="documentation-number">
 05
@@ -3300,16 +3383,18 @@ visual material without repeatedly counting overlapping boxes.
 
 <section class="documentation-content">
 
-<h3>Visual similarity</h3>
+<h3>Visual similarity and clustering</h3>
 
 <p>
 OpenCLIP image embeddings represent the extracted regions. PCA
-reduces dimensionality, UMAP creates the interactive map and
-HDBSCAN identifies dense visual groups without forcing every image
-into a cluster.
+reduces the embedding dimensionality, UMAP creates the interactive
+two-dimensional map, and HDBSCAN identifies dense visual groups
+without forcing every image into a cluster. Images outside stable
+dense regions remain unassigned.
 </p>
 
 </section>
+
 
 <div class="documentation-number">
 06
@@ -3317,13 +3402,61 @@ into a cluster.
 
 <section class="documentation-content">
 
-<h3>Interpretation</h3>
+<h3>Semantic text and image search</h3>
 
 <p>
-Confidence is not equivalent to correctness. Visual clusters are
-computational groupings rather than historical categories. Changes
-over time can also reflect scan quality, page layout and missing
-metadata.
+Semantic retrieval uses
+<strong>OpenAI CLIP ViT-B/32</strong>. The public image index is
+generated locally with
+<code>{html.escape(str(semantic_python_model))}</code>, while text
+queries and uploaded image examples are encoded in the browser with
+<code>{html.escape(str(semantic_browser_model))}</code>.
+</p>
+
+<p>
+Image and query vectors are L2-normalized and ranked through cosine
+similarity. The search covers
+<strong>{semantic_indexed_items:,} public images</strong>, rather
+than the complete private research collection.
+</p>
+
+</section>
+
+
+<div class="documentation-number">
+07
+</div>
+
+<section class="documentation-content">
+
+<h3>Client-side execution and privacy</h3>
+
+<p>
+The semantic encoders are downloaded only when a search is first
+requested and are normally cached by the browser for later use.
+Text queries and uploaded image examples are processed locally in
+the visitor's browser. Uploaded images are not sent to this website
+or stored by the application.
+</p>
+
+</section>
+
+
+<div class="documentation-number">
+08
+</div>
+
+<section class="documentation-content">
+
+<h3>Interpretation and limitations</h3>
+
+<p>
+Detection confidence is not equivalent to correctness. Visual
+clusters are computational groupings rather than historical
+categories, and semantic similarity does not guarantee historical
+or iconographic equivalence. Results can also reflect scan quality,
+cropping, contrast, page layout, missing metadata and biases in the
+pretrained representation models.
 </p>
 
 </section>
@@ -3345,6 +3478,10 @@ display(
 ```{python}
 #| output: asis
 
+# ============================================================
+# CLUSTERING PROVENANCE
+# ============================================================
+
 openclip_model = (
     cluster_method.get(
         "embedding_model"
@@ -3360,6 +3497,15 @@ openclip_pretrained = (
 cluster_min_confidence = (
     cluster_method.get(
         "minimum_yolo_confidence"
+    )
+)
+
+cluster_selection_method = (
+    cluster_method.get(
+        "cluster_selection_method"
+    )
+    or cluster_method.get(
+        "selection_method"
     )
 )
 
@@ -3382,6 +3528,10 @@ else:
     pca_components = None
 
 
+# ============================================================
+# PROVENANCE TABLE
+# ============================================================
+
 provenance_rows = [
     (
         "Collection period",
@@ -3398,6 +3548,14 @@ provenance_rows = [
     (
         "Detected visual elements",
         f"{total_detections:,}",
+    ),
+
+    # Detection model
+    (
+        "Detection model",
+        safe_text(
+            model_name
+        ),
     ),
     (
         "Training image size",
@@ -3435,8 +3593,10 @@ provenance_rows = [
             best_checkpoint_name
         ),
     ),
+
+    # Visual clustering
     (
-        "Embedding library",
+        "Clustering embedding library",
         safe_text(
             cluster_method.get(
                 "embedding_library"
@@ -3444,13 +3604,13 @@ provenance_rows = [
         ),
     ),
     (
-        "Embedding model",
+        "Clustering embedding model",
         safe_text(
             openclip_model
         ),
     ),
     (
-        "Embedding checkpoint",
+        "Clustering embedding checkpoint",
         safe_text(
             openclip_pretrained
         ),
@@ -3484,12 +3644,86 @@ provenance_rows = [
         ),
     ),
     (
-        "Clustered items",
+        "HDBSCAN selection method",
+        safe_text(
+            cluster_selection_method
+        ),
+    ),
+    (
+        "Clustered index items",
         f"{int(cluster_summary.get('items', 0)):,}",
     ),
     (
         "Visual clusters",
         f"{int(cluster_summary.get('cluster_count', 0)):,}",
+    ),
+    (
+        "Unassigned cluster items",
+        f"{int(cluster_summary.get('noise_items', 0)):,}",
+    ),
+    (
+        "Clustering silhouette score",
+        safe_text(
+            cluster_summary.get(
+                "silhouette_score"
+            )
+        ),
+    ),
+
+    # Semantic search
+    (
+        "Semantic search family",
+        safe_text(
+            semantic_family
+        ),
+    ),
+    (
+        "Semantic search architecture",
+        safe_text(
+            semantic_architecture
+        ),
+    ),
+    (
+        "Semantic index model",
+        safe_text(
+            semantic_python_model
+        ),
+    ),
+    (
+        "Browser query model",
+        safe_text(
+            semantic_browser_model
+        ),
+    ),
+    (
+        "Semantic embedding dimension",
+        safe_text(
+            semantic_dimension
+        ),
+    ),
+    (
+        "Semantic vector normalization",
+        safe_text(
+            semantic_normalization
+        ),
+    ),
+    (
+        "Semantic search indexed images",
+        f"{semantic_indexed_items:,}",
+    ),
+    (
+        "Semantic index minimum confidence",
+        safe_text(
+            semantic_min_confidence
+        ),
+    ),
+    (
+        "Semantic ranking measure",
+        "Cosine similarity",
+    ),
+    (
+        "Semantic execution environment",
+        "Client-side / Transformers.js",
     ),
 ]
 
@@ -3553,10 +3787,12 @@ display(
 <div class="archive-note">
 
 **Publication note.** Original newspaper pages, uncompressed crops,
-model checkpoints and local filesystem paths are excluded from the
-public interface. The GitHub Pages edition contains optimized WebP
-thumbnails, compact JSON records, selected validation diagnostics
-and client-side visualizations.
+model checkpoints, local filesystem paths and private research data
+are excluded from the public interface. The GitHub Pages edition
+contains optimized WebP thumbnails, compact metadata records,
+selected validation diagnostics, visual-clustering coordinates and
+a static CLIP image index. Semantic queries are encoded and compared
+with the index directly in the browser.
 
 </div>
 
