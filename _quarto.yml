@@ -5,8 +5,11 @@ project:
 resources:
   - dashboard_data.json
   - clusters.json
+  - semantic_index.f32
+  - semantic_index_metadata.json
   - dashboard.js
   - clusters.js
+  - semantic-search.js
   - dashboard_assets/**
   - .nojekyll
 

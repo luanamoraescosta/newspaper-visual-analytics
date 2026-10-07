@@ -14,8 +14,11 @@ format:
 resources:
   - dashboard_data.json
   - clusters.json
+  - semantic_index.f32
+  - semantic_index_metadata.json
   - dashboard.js
   - clusters.js
+  - semantic-search.js
   - dashboard_assets/**
   - .nojekyll
 execute:
@@ -2842,7 +2845,292 @@ Show noise / unassigned
 
 </div>
 
-# 06 / Visual Explorer
+# 06 / Semantic Search
+
+## Row
+
+<div class="semantic-search-intro">
+
+<span class="archive-tag">
+EXPERIMENTAL / CLIENT-SIDE RETRIEVAL
+</span>
+
+<h2>
+Search the visual archive
+</h2>
+
+<p>
+Search with an English description or upload an image example.
+CLIP compares the query with the public sample of extracted
+newspaper images. Uploaded images are processed locally and are not
+sent to this website. The first time a search is requested, the CLIP model is downloaded, this will take some time, but just for the first search. Subsequent searches will be faster.
+</p>
+
+</div>
+
+## Row
+
+<div class="semantic-mode-controls">
+
+<label>
+Search mode
+
+<select id="semantic-mode">
+<option value="text">Text description</option>
+<option value="image">Image example</option>
+</select>
+
+</label>
+
+</div>
+
+<div
+    id="semantic-text-panel"
+    class="semantic-query-panel"
+>
+
+<label class="semantic-query-control">
+
+Text query
+
+<div class="semantic-query-line">
+
+<input
+    id="semantic-query"
+    type="search"
+    placeholder="portrait of a woman"
+/>
+
+<button
+    id="semantic-text-search-button"
+    type="button"
+>
+Search
+</button>
+
+</div>
+
+</label>
+
+<div class="semantic-examples">
+
+<span>TRY:</span>
+
+<button
+    type="button"
+    class="semantic-example"
+    data-query="portrait of a woman"
+>
+portrait of a woman
+</button>
+
+<button
+    type="button"
+    class="semantic-example"
+    data-query="urban architecture"
+>
+urban architecture
+</button>
+
+<button
+    type="button"
+    class="semantic-example"
+    data-query="crowd of people"
+>
+crowd of people
+</button>
+
+<button
+    type="button"
+    class="semantic-example"
+    data-query="decorative illustration"
+>
+decorative illustration
+</button>
+
+<button
+    type="button"
+    class="semantic-example"
+    data-query="landscape"
+>
+landscape
+</button>
+
+</div>
+
+</div>
+
+<div
+    id="semantic-image-panel"
+    class="semantic-query-panel"
+    hidden
+>
+
+<label class="semantic-upload-control">
+
+Image example
+
+<input
+    id="semantic-image-input"
+    type="file"
+    accept="image/png,image/jpeg,image/webp"
+/>
+
+</label>
+
+<div
+    id="semantic-upload-preview"
+    class="semantic-upload-preview"
+>
+
+<span>
+No image selected
+</span>
+
+</div>
+
+<button
+    id="semantic-image-search-button"
+    type="button"
+    disabled
+>
+Find similar images
+</button>
+
+<p class="semantic-privacy-note">
+The selected image is processed locally in your browser.
+</p>
+
+</div>
+
+<div class="semantic-controls">
+
+<label>
+Year
+
+<select id="semantic-year">
+<option value="">All years</option>
+</select>
+
+</label>
+
+<label>
+
+Minimum YOLO confidence
+
+<input
+    id="semantic-confidence"
+    type="range"
+    min="0"
+    max="100"
+    value="0"
+/>
+
+<strong id="semantic-confidence-value">
+0%
+</strong>
+
+</label>
+
+<label>
+
+Results
+
+<select id="semantic-limit">
+<option value="12">12</option>
+<option value="24" selected>24</option>
+<option value="48">48</option>
+<option value="96">96</option>
+</select>
+
+</label>
+
+</div>
+
+<div
+    id="semantic-model-progress"
+    class="semantic-model-progress"
+    hidden
+    aria-live="polite"
+>
+
+<div class="semantic-progress-header">
+
+<span id="semantic-progress-label">
+Loading CLIP
+</span>
+
+<span
+    id="semantic-progress-percent"
+    class="semantic-progress-percent"
+>
+0%
+</span>
+
+</div>
+
+<div
+    id="semantic-progress-track"
+    class="semantic-progress-track"
+    role="progressbar"
+    aria-label="CLIP model loading progress"
+    aria-valuemin="0"
+    aria-valuemax="100"
+    aria-valuenow="0"
+>
+
+<div
+    id="semantic-progress-fill"
+    class="semantic-progress-fill"
+></div>
+
+</div>
+
+<div
+    id="semantic-progress-detail"
+    class="semantic-progress-detail"
+>
+Preparing model…
+</div>
+
+</div>
+
+<div
+    id="semantic-status"
+    class="semantic-status"
+>
+The CLIP model is loaded only when a search is requested.
+</div>
+
+## Row
+
+<div
+    id="semantic-results"
+    class="semantic-results"
+></div>
+
+<div
+    id="semantic-modal"
+    class="gallery-modal"
+    aria-hidden="true"
+>
+
+<div class="gallery-modal-content">
+
+<button
+    id="semantic-modal-close"
+    aria-label="Close semantic result"
+>
+×
+</button>
+
+<div id="semantic-modal-body"></div>
+
+</div>
+
+</div>
+
+# 07 / Visual Explorer
 
 ## Row
 
@@ -2931,7 +3219,7 @@ Newest first
 
 </div>
 
-# 07 / Documentation
+# 08 / Documentation
 
 ## Row
 
@@ -3274,3 +3562,7 @@ and client-side visualizations.
 
 <script src="dashboard.js"></script>
 <script src="clusters.js"></script>
+<script
+    type="module"
+    src="semantic-search.js"
+></script>

@@ -23,16 +23,15 @@ Importante:
 
 Exemplo:
 
-    python prepare_dashboard.py \
-        --detections "/caminho/resultados_inferencia_resultados.json" \
-        --pages "/caminho/resultados_inferencia_paginas.json" \
-        --metadata "/caminho/metadata_enriquecido.json" \
-        --inference-manifest "/caminho/resultados_inferencia_execucao.json" \
-        --training-dir "/caminho/runs_jornal/layout_jornal_det" \
-        --validation-dir "/caminho/runs_jornal/layout_jornal_det/validation" \
-        --max-gallery-items 1500 \
-        --sampling stratified \
-        --seed 42
+python3 prepare_dashboard.py \
+  --detections "/Users/luanamoraescosta/DH/ilustracao/ilustracaobrasil/resultados_inferencia_resultados.json" \
+  --pages "/Users/luanamoraescosta/DH/ilustracao/ilustracaobrasil/resultados_inferencia_paginas.json" \
+  --metadata "/Users/luanamoraescosta/DH/ilustracao/ilustracaobrasil/metadata_enriquecido.json" \
+  --inference-manifest "/Users/luanamoraescosta/DH/ilustracao/ilustracaobrasil/resultados_inferencia_execucao.json" \
+  --training-dir "/Users/luanamoraescosta/DH/ilustracao/finetune/runs/detect/runs_jornal/layout_jornal_det" \
+  --max-gallery-items 5000 \
+  --sampling stratified \
+  --seed 42
 """
 
 import argparse

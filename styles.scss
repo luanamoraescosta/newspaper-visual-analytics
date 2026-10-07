@@ -3029,3 +3029,1109 @@ input[type="checkbox"] {
         grid-column: auto;
     }
 }
+
+/* ==========================================================
+   SEMANTIC SEARCH
+   ========================================================== */
+
+.semantic-search-intro {
+    padding: 1.1rem;
+
+    border: var(--border);
+
+    background: var(--green);
+}
+
+.semantic-search-intro h2 {
+    max-width: 16ch;
+    margin: 0.8rem 0 0.65rem;
+
+    color: var(--violet);
+
+    font-size: clamp(
+        1.7rem,
+        4vw,
+        3.4rem
+    );
+}
+
+.semantic-search-intro p {
+    max-width: 70ch;
+    margin: 0;
+}
+
+
+/* ==========================================================
+   SEARCH MODE
+   ========================================================== */
+
+.semantic-mode-controls {
+    display: grid;
+    grid-template-columns:
+        minmax(190px, 280px)
+        1fr;
+
+    border-top: var(--border);
+    border-left: var(--border);
+
+    background: var(--paper);
+}
+
+.semantic-mode-controls label {
+    padding: 0.6rem;
+
+    border-right: var(--border);
+    border-bottom: var(--border);
+
+    color: var(--muted);
+
+    font-size: 0.61rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.semantic-mode-controls select {
+    display: block;
+
+    width: 100%;
+    margin-top: 0.35rem;
+}
+
+
+/* ==========================================================
+   QUERY PANELS
+   ========================================================== */
+
+.semantic-query-panel {
+    padding: 0.8rem;
+
+    border: var(--border);
+    border-top: 0;
+
+    background: var(--paper);
+}
+
+.semantic-query-panel[hidden] {
+    display: none !important;
+}
+
+.semantic-query-control {
+    display: block;
+
+    color: var(--muted);
+
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.semantic-query-line {
+    display: grid;
+    grid-template-columns:
+        minmax(0, 1fr)
+        auto;
+
+    max-width: 950px;
+    margin-top: 0.4rem;
+}
+
+.semantic-query-line input {
+    width: 100%;
+    min-width: 0;
+
+    border-right: 0 !important;
+}
+
+.semantic-query-line button {
+    width: auto !important;
+    min-width: 105px;
+    margin: 0;
+
+    color: var(--paper-light);
+    background: var(--violet);
+
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.semantic-query-line button:hover,
+.semantic-query-line button:focus {
+    color: var(--ink);
+    background: var(--yellow);
+}
+
+
+/* ==========================================================
+   SEARCH SUGGESTIONS
+   ========================================================== */
+
+.semantic-examples {
+    display: flex !important;
+    flex-flow: row wrap !important;
+    gap: 0 !important;
+    align-items: stretch;
+
+    width: 100%;
+    margin-top: 0.7rem;
+
+    border-top: var(--border);
+    border-left: var(--border);
+}
+
+.semantic-examples > span {
+    display: inline-flex;
+    align-items: center;
+
+    width: auto;
+    min-height: 34px;
+    padding: 0.35rem 0.55rem;
+
+    border-right: var(--border);
+    border-bottom: var(--border);
+
+    color: var(--paper-light);
+    background: var(--ink);
+
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+}
+
+.semantic-examples .semantic-example {
+    display: inline-flex !important;
+    flex: 0 0 auto !important;
+    align-items: center;
+
+    width: auto !important;
+    min-width: 0 !important;
+    min-height: 34px;
+    margin: 0 !important;
+    padding: 0.35rem 0.55rem !important;
+
+    border: 0 !important;
+    border-right: var(--border) !important;
+    border-bottom: var(--border) !important;
+    border-radius: 0 !important;
+
+    color: var(--ink);
+    background: var(--paper-light);
+
+    font-size: 0.58rem;
+    font-weight: 400;
+    line-height: 1.25;
+    text-align: left;
+    text-transform: lowercase;
+    white-space: nowrap;
+
+    box-shadow: none !important;
+}
+
+.semantic-examples .semantic-example:hover,
+.semantic-examples .semantic-example:focus {
+    color: var(--paper-light);
+    background: var(--violet);
+
+    outline: none;
+}
+
+
+/* ==========================================================
+   FILTER CONTROLS
+   ========================================================== */
+
+.semantic-controls {
+    display: grid;
+    grid-template-columns:
+        repeat(
+            3,
+            minmax(150px, 1fr)
+        );
+
+    gap: 0;
+
+    margin-top: 0.8rem;
+
+    border-top: var(--border);
+    border-left: var(--border);
+
+    background: var(--paper);
+}
+
+.semantic-controls > label {
+    min-width: 0;
+    padding: 0.6rem;
+
+    border-right: var(--border);
+    border-bottom: var(--border);
+
+    color: var(--muted);
+
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.semantic-controls select,
+.semantic-controls input {
+    display: block;
+
+    width: 100%;
+    margin-top: 0.35rem;
+}
+
+.semantic-controls strong {
+    display: inline-block;
+
+    margin-top: 0.25rem;
+
+    color: var(--violet);
+
+    font-size: 0.65rem;
+}
+
+
+/* ==========================================================
+   STATUS
+   ========================================================== */
+
+.semantic-status {
+    margin: 0.8rem 0;
+    padding: 0.5rem 0;
+
+    border-top: var(--border);
+    border-bottom: var(--border);
+
+    color: var(--muted);
+
+    font-size: 0.62rem;
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+}
+
+
+/* ==========================================================
+   RESULTS GALLERY
+   ========================================================== */
+
+.semantic-results {
+    display: grid !important;
+    grid-template-columns:
+        repeat(
+            auto-fill,
+            minmax(180px, 1fr)
+        ) !important;
+
+    align-items: stretch;
+    gap: 0 !important;
+
+    width: 100%;
+
+    border-top: var(--border);
+    border-left: var(--border);
+}
+
+.semantic-results .semantic-result-card {
+    position: relative;
+    overflow: hidden;
+
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    min-height: 300px;
+    margin: 0 !important;
+    padding: 0 !important;
+
+    border: 0 !important;
+    border-right: var(--border) !important;
+    border-bottom: var(--border) !important;
+    border-radius: 0 !important;
+
+    color: var(--ink);
+    background: var(--paper);
+
+    text-align: left;
+
+    box-shadow: none !important;
+
+    transition:
+        color 100ms linear,
+        background-color 100ms linear;
+}
+
+.semantic-results .semantic-result-card:hover,
+.semantic-results .semantic-result-card:focus {
+    color: var(--paper-light);
+    background: var(--violet);
+
+    outline: none;
+    transform: none;
+    box-shadow: none !important;
+}
+
+.semantic-rank {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 2;
+
+    display: block;
+
+    padding: 0.23rem 0.4rem;
+
+    border-right: var(--border);
+    border-bottom: var(--border);
+
+    color: var(--ink);
+    background: var(--yellow);
+
+    font-size: 0.59rem;
+    font-weight: 700;
+}
+
+
+/* ==========================================================
+   RESULT IMAGE
+   ========================================================== */
+
+.semantic-image {
+    display: flex !important;
+    flex: 0 0 220px;
+    align-items: center;
+    justify-content: center;
+
+    width: 100% !important;
+    height: 220px !important;
+    padding: 0.55rem;
+
+    border-bottom: var(--border);
+
+    background: var(--paper-light);
+}
+
+.semantic-image img {
+    display: block;
+
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+
+    object-fit: contain !important;
+
+    filter:
+        saturate(0.88)
+        contrast(1.03);
+}
+
+
+/* ==========================================================
+   RESULT METADATA
+   ========================================================== */
+
+.semantic-result-data {
+    display: flex !important;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.22rem;
+
+    width: 100%;
+    min-height: 78px;
+    padding: 0.55rem;
+}
+
+.semantic-result-data strong {
+    color: inherit;
+
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.025em;
+}
+
+.semantic-result-data small {
+    color: var(--muted);
+
+    font-size: 0.58rem;
+    line-height: 1.35;
+}
+
+.semantic-result-card:hover
+.semantic-result-data small,
+.semantic-result-card:focus
+.semantic-result-data small {
+    color: var(--paper-light);
+}
+
+
+/* ==========================================================
+   IMAGE UPLOAD
+   ========================================================== */
+
+.semantic-upload-control {
+    display: block;
+
+    color: var(--muted);
+
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.semantic-upload-control input {
+    display: block;
+
+    width: 100%;
+    margin-top: 0.4rem;
+}
+
+.semantic-upload-preview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    min-height: 210px;
+    margin: 0.8rem 0;
+
+    border: var(--border);
+
+    color: var(--muted);
+    background:
+        repeating-linear-gradient(
+            135deg,
+            var(--paper-light) 0,
+            var(--paper-light) 8px,
+            var(--paper-dark) 8px,
+            var(--paper-dark) 9px
+        );
+
+    font-size: 0.62rem;
+    text-transform: uppercase;
+}
+
+.semantic-upload-preview img {
+    display: block;
+
+    width: auto;
+    max-width: min(
+        100%,
+        520px
+    );
+    height: auto;
+    max-height: 340px;
+
+    object-fit: contain;
+
+    background: var(--paper-light);
+}
+
+.semantic-upload-preview:has(img) {
+    flex-direction: column;
+    gap: 0.5rem;
+
+    padding: 0.65rem;
+}
+
+.semantic-upload-preview:has(img) span {
+    color: var(--ink);
+    font-size: 0.57rem;
+}
+
+#semantic-image-search-button {
+    width: auto !important;
+
+    color: var(--paper-light);
+    background: var(--violet);
+
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+#semantic-image-search-button:hover,
+#semantic-image-search-button:focus {
+    color: var(--ink);
+    background: var(--yellow);
+}
+
+#semantic-image-search-button:disabled {
+    cursor: not-allowed;
+
+    color: var(--muted);
+    background: var(--paper-dark);
+
+    opacity: 0.65;
+}
+
+.semantic-privacy-note {
+    margin: 0.6rem 0 0;
+
+    color: var(--muted);
+
+    font-size: 0.58rem;
+    text-transform: uppercase;
+}
+
+
+/* ==========================================================
+   SEMANTIC MODAL CLOSE
+   ========================================================== */
+
+#semantic-modal-close {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 10;
+
+    width: 44px !important;
+    height: 44px;
+    padding: 0;
+
+    border-top: 0 !important;
+    border-right: 0 !important;
+
+    color: var(--ink);
+    background: var(--yellow);
+
+    font-size: 1.6rem;
+    line-height: 1;
+}
+
+
+/* ==========================================================
+   RESPONSIVE SEMANTIC SEARCH
+   ========================================================== */
+
+@media (min-width: 1500px) {
+    .semantic-results {
+        grid-template-columns:
+            repeat(
+                auto-fill,
+                minmax(200px, 1fr)
+            ) !important;
+    }
+}
+
+@media (max-width: 1100px) {
+    .semantic-results {
+        grid-template-columns:
+            repeat(
+                auto-fill,
+                minmax(170px, 1fr)
+            ) !important;
+    }
+
+    .semantic-image {
+        flex-basis: 200px;
+        height: 200px !important;
+    }
+}
+
+@media (max-width: 850px) {
+    .semantic-mode-controls {
+        grid-template-columns: 1fr;
+    }
+
+    .semantic-controls {
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(160px, 1fr)
+            );
+    }
+
+    .semantic-results {
+        grid-template-columns:
+            repeat(
+                3,
+                minmax(140px, 1fr)
+            ) !important;
+    }
+
+    .semantic-image {
+        flex-basis: 180px;
+        height: 180px !important;
+    }
+}
+
+@media (max-width: 650px) {
+    .semantic-controls {
+        grid-template-columns: 1fr;
+    }
+
+    .semantic-query-line {
+        grid-template-columns: 1fr;
+    }
+
+    .semantic-query-line input {
+        border-right: var(--border) !important;
+        border-bottom: 0 !important;
+    }
+
+    .semantic-query-line button {
+        width: 100% !important;
+    }
+
+    .semantic-examples {
+        display: grid !important;
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(0, 1fr)
+            );
+    }
+
+    .semantic-examples > span {
+        grid-column:
+            1 / -1;
+    }
+
+    .semantic-examples
+    .semantic-example {
+        width: 100% !important;
+        white-space: normal;
+    }
+
+    .semantic-results {
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(130px, 1fr)
+            ) !important;
+    }
+
+    .semantic-image {
+        flex-basis: 165px;
+        height: 165px !important;
+    }
+
+    .semantic-result-card {
+        min-height: 250px;
+    }
+}
+
+@media (max-width: 390px) {
+    .semantic-examples,
+    .semantic-results {
+        grid-template-columns:
+            1fr !important;
+    }
+
+    .semantic-image {
+        flex-basis: 220px;
+        height: 220px !important;
+    }
+}
+
+/* ==========================================================
+   CLIP MODEL LOADING PROGRESS
+   ========================================================== */
+
+.semantic-model-progress {
+    width: 100%;
+    margin: 0.8rem 0 1rem;
+
+    border: var(--border);
+
+    color: var(--ink);
+    background: var(--paper);
+
+    font-family:
+        "Space Mono",
+        "Courier New",
+        monospace;
+}
+
+.semantic-model-progress[hidden] {
+    display: none !important;
+}
+
+
+/* ==========================================================
+   PROGRESS HEADER
+   ========================================================== */
+
+.semantic-progress-header {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    justify-content: space-between;
+
+    min-height: 40px;
+    padding: 0.55rem 0.7rem;
+
+    border-bottom: var(--border);
+
+    color: var(--paper-light);
+    background: var(--violet);
+
+    font-size: 0.63rem;
+    font-weight: 700;
+    line-height: 1.3;
+    letter-spacing: 0.055em;
+    text-transform: uppercase;
+}
+
+#semantic-progress-label {
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.semantic-progress-percent {
+    flex: 0 0 auto;
+
+    min-width: 52px;
+
+    color: var(--yellow);
+
+    font-size: 0.68rem;
+    text-align: right;
+}
+
+
+/* ==========================================================
+   PROGRESS TRACK
+   ========================================================== */
+
+.semantic-progress-track {
+    position: relative;
+    overflow: hidden;
+
+    width: 100%;
+    height: 22px;
+
+    border-bottom: var(--border);
+
+    background:
+        repeating-linear-gradient(
+            135deg,
+            var(--paper-light) 0,
+            var(--paper-light) 7px,
+            var(--paper-dark) 7px,
+            var(--paper-dark) 8px
+        );
+}
+
+.semantic-progress-fill {
+    width: 0;
+    height: 100%;
+
+    border-right: 1px solid var(--ink);
+
+    background: var(--green);
+
+    transition:
+        width 150ms linear;
+}
+
+
+/* ==========================================================
+   FILE / DOWNLOAD DETAIL
+   ========================================================== */
+
+.semantic-progress-detail {
+    overflow: hidden;
+
+    min-height: 34px;
+    padding: 0.5rem 0.7rem;
+
+    color: var(--muted);
+    background: var(--paper-dark);
+
+    font-size: 0.58rem;
+    line-height: 1.4;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+/* ==========================================================
+   INDETERMINATE STATE
+   Used while the total file size is unknown.
+   ========================================================== */
+
+.semantic-model-progress.is-indeterminate
+.semantic-progress-fill {
+    width: 34%;
+
+    border-right: var(--border);
+
+    background:
+        linear-gradient(
+            90deg,
+            var(--green),
+            var(--blue),
+            var(--yellow)
+        );
+
+    animation:
+        semantic-progress-indeterminate
+        1.2s linear infinite;
+}
+
+.semantic-model-progress.is-indeterminate
+.semantic-progress-track {
+    background:
+        repeating-linear-gradient(
+            135deg,
+            var(--paper-light) 0,
+            var(--paper-light) 7px,
+            var(--paper-dark) 7px,
+            var(--paper-dark) 8px
+        );
+}
+
+
+/* ==========================================================
+   COMPLETE STATE
+   ========================================================== */
+
+.semantic-model-progress.is-complete
+.semantic-progress-header {
+    color: var(--ink);
+    background: var(--green);
+}
+
+.semantic-model-progress.is-complete
+.semantic-progress-percent {
+    color: var(--ink);
+}
+
+.semantic-model-progress.is-complete
+.semantic-progress-fill {
+    width: 100%;
+
+    border-right: 0;
+
+    background: var(--green);
+}
+
+.semantic-model-progress.is-complete
+.semantic-progress-detail {
+    color: var(--ink);
+}
+
+
+/* ==========================================================
+   ERROR STATE
+   ========================================================== */
+
+.semantic-model-progress.is-error {
+    border-color: var(--violet-dark);
+}
+
+.semantic-model-progress.is-error
+.semantic-progress-header {
+    color: var(--paper-light);
+    background: var(--violet-dark);
+}
+
+.semantic-model-progress.is-error
+.semantic-progress-percent {
+    color: var(--yellow);
+}
+
+.semantic-model-progress.is-error
+.semantic-progress-fill {
+    background: var(--pink);
+}
+
+.semantic-model-progress.is-error
+.semantic-progress-detail {
+    color: var(--violet-dark);
+}
+
+
+/* ==========================================================
+   ANIMATION
+   ========================================================== */
+
+@keyframes semantic-progress-indeterminate {
+    from {
+        transform: translateX(-110%);
+    }
+
+    to {
+        transform: translateX(310%);
+    }
+}
+
+
+/* ==========================================================
+   RESPONSIVE
+   ========================================================== */
+
+@media (max-width: 600px) {
+    .semantic-progress-header {
+        align-items: flex-start;
+        min-height: 44px;
+
+        font-size: 0.57rem;
+    }
+
+    #semantic-progress-label {
+        white-space: normal;
+    }
+
+    .semantic-progress-percent {
+        min-width: 44px;
+
+        font-size: 0.62rem;
+    }
+
+    .semantic-progress-detail {
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+}
+
+
+/* ==========================================================
+   REDUCED MOTION
+   ========================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    .semantic-progress-fill {
+        transition: none;
+    }
+
+    .semantic-model-progress.is-indeterminate
+    .semantic-progress-fill {
+        width: 100%;
+
+        animation: none;
+    }
+}
+
+/* ==========================================================
+   FIX — VISUAL CONTENT BARS
+   Deve ficar no final do styles.scss
+   ========================================================== */
+
+.holdings-detection {
+    display: grid !important;
+    grid-template-columns:
+        minmax(140px, 1fr)
+        74px !important;
+
+    gap: 0.7rem !important;
+    align-items: center !important;
+
+    width: 100% !important;
+    min-width: 0;
+}
+
+
+/* Trilha completa de 0% a 100% */
+
+.holdings-detection-track {
+    position: relative;
+
+    display: block !important;
+    overflow: hidden;
+
+    width: 100% !important;
+    min-width: 120px !important;
+    height: 16px !important;
+    min-height: 16px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+
+    border: 1px solid var(--ink) !important;
+
+    background:
+        repeating-linear-gradient(
+            135deg,
+            var(--paper-light) 0,
+            var(--paper-light) 6px,
+            var(--paper-dark) 6px,
+            var(--paper-dark) 7px
+        ) !important;
+}
+
+
+/* Parte preenchida conforme a porcentagem */
+
+.holdings-detection-bar {
+    display: block !important;
+
+    height: 100% !important;
+    min-height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+
+    border: 0 !important;
+    border-right: 1px solid var(--ink) !important;
+
+    background: var(--violet) !important;
+
+    transform: none !important;
+    opacity: 1 !important;
+}
+
+
+/* Número ao lado da barra */
+
+.holdings-detection > span {
+    display: flex !important;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+
+    width: auto !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+
+    color: var(--violet) !important;
+
+    font-size: 0.68rem !important;
+    font-weight: 700;
+    line-height: 1.15;
+    text-align: right !important;
+}
+
+
+/* Quantidade absoluta de páginas */
+
+.holdings-detection > span small {
+    display: block !important;
+
+    margin-top: 0.18rem;
+
+    color: var(--muted);
+
+    font-size: 0.52rem;
+    font-weight: 400;
+    white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+    .holdings-detection {
+        grid-template-columns:
+            minmax(120px, 1fr)
+            68px !important;
+    }
+
+    .holdings-detection-track {
+        min-width: 100px !important;
+    }
+}
+
+@media (max-width: 470px) {
+    .holdings-detection {
+        grid-template-columns: 1fr !important;
+    }
+
+    .holdings-detection > span {
+        align-items: flex-start;
+        text-align: left !important;
+    }
+}
