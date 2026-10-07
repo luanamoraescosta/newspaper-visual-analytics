@@ -374,7 +374,6 @@ b {
     min-height: 420px;
     padding: clamp(1.4rem, 4vw, 3.5rem);
 
-    border-right: var(--border);
 }
 
 .archive-kicker {
@@ -2166,7 +2165,6 @@ input[type="checkbox"] {
     }
 
     .archive-hero-main {
-        border-right: 0;
         border-bottom: var(--border);
     }
 
