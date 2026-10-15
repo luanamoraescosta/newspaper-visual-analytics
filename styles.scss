@@ -415,6 +415,17 @@ b {
     background: var(--ochre);
 }
 
+/*
+   Fix: o Quarto aplica
+   `aside:not(.footnotes):not(.sidebar) { grid-column: body-content-start/body-content-end !important }`
+   aos <aside>, forçando uma posição de coluna que quebra o grid do hero.
+   Sobrescrevemos para que os <aside> participem do grid normalmente.
+*/
+.archive-hero > aside.archive-hero-index,
+.catalogue-header > aside.catalogue-index {
+    grid-column: auto !important;
+}
+
 .archive-record-number {
     color: var(--paper-light);
     font-size: clamp(3rem, 8vw, 7rem);
