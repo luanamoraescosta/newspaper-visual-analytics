@@ -1585,6 +1585,13 @@ def main():
         )
     )
 
+    if (
+        "imgsz_treinamento" not in training_manifest
+    ):
+        training_manifest[
+            "imgsz_treinamento"
+        ] = 640
+
     # ========================================================
     # MANIFESTO DA INFERÊNCIA
     # ========================================================

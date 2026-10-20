@@ -1962,6 +1962,7 @@ input[type="checkbox"] {
 }
 
 .cluster-example-image {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -3410,6 +3411,7 @@ input[type="checkbox"] {
    ========================================================== */
 
 .semantic-image {
+    position: relative;
     display: flex !important;
     flex: 0 0 220px;
     align-items: center;
@@ -3437,6 +3439,84 @@ input[type="checkbox"] {
     filter:
         saturate(0.88)
         contrast(1.03);
+}
+
+
+/* ==========================================================
+   FIND SIMILAR IMAGES BUTTON
+   ========================================================== */
+
+.semantic-results-flash {
+    outline: 2px solid var(--violet);
+    outline-offset: -2px;
+}
+
+.similar-image-button {
+    position: absolute;
+    right: 0.45rem;
+    bottom: 0.45rem;
+    z-index: 3;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 1.6rem;
+    height: 1.6rem;
+    padding: 0;
+
+    border: var(--border);
+    border-radius: 999px;
+
+    color: var(--ink);
+    background: var(--paper);
+
+    cursor: pointer;
+
+    transition:
+        color 100ms linear,
+        background-color 100ms linear;
+}
+
+.similar-image-button svg {
+    display: block;
+
+    width: 0.95rem;
+    height: 0.95rem;
+}
+
+.similar-image-button svg circle,
+.similar-image-button svg line {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+}
+
+.similar-image-button:hover {
+    color: var(--paper-light);
+    background: var(--violet);
+}
+
+
+/* SVG-based similar button (graph + UMAP nodes) */
+
+.similar-svg-button {
+    cursor: pointer;
+}
+
+.similar-svg-bg {
+    fill: var(--paper);
+    stroke: var(--line);
+    stroke-width: 1;
+}
+
+.similar-svg-lens,
+.similar-svg-handle {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 1.7;
+    stroke-linecap: round;
 }
 
 
@@ -4018,6 +4098,368 @@ input[type="checkbox"] {
 
         animation: none;
     }
+}
+
+/* ==========================================================
+   QUERY INTERSECTION GRAPH
+   ========================================================== */
+
+#semantic-graph-search-button {
+    width: auto !important;
+    min-width: 150px;
+    margin: 0.8rem 0 0;
+
+    color: var(--paper-light);
+    background: var(--violet);
+
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+#semantic-graph-search-button:hover,
+#semantic-graph-search-button:focus {
+    color: var(--ink);
+    background: var(--yellow);
+}
+
+#semantic-graph-search-button:disabled {
+    cursor: not-allowed;
+
+    color: var(--muted);
+    background: var(--paper-dark);
+
+    opacity: 0.65;
+}
+
+.semantic-graph-controls {
+    display: grid;
+    grid-template-columns:
+        repeat(3, minmax(150px, 1fr));
+
+    gap: 0;
+    margin-top: 0.8rem;
+
+    border-top: var(--border);
+    border-left: var(--border);
+
+    background: var(--paper);
+}
+
+.semantic-graph-controls > label {
+    min-width: 0;
+    padding: 0.6rem;
+
+    border-right: var(--border);
+    border-bottom: var(--border);
+
+    color: var(--muted);
+
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.semantic-graph-controls select,
+.semantic-graph-controls input {
+    display: block;
+
+    width: 100%;
+    margin-top: 0.35rem;
+}
+
+.semantic-graph-controls strong {
+    display: inline-block;
+
+    margin-top: 0.25rem;
+
+    color: var(--violet);
+
+    font-size: 0.65rem;
+}
+
+.semantic-graph-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.semantic-graph-checkbox input {
+    width: auto;
+    margin: 0;
+}
+
+.semantic-graph-wrap {
+    margin: 0.8rem 0;
+    border: var(--border);
+
+    background: var(--paper);
+}
+
+.semantic-graph-wrap[hidden] {
+    display: none !important;
+}
+
+.semantic-graph-header {
+    padding: 0.55rem 0.7rem;
+
+    border-bottom: var(--border);
+
+    color: var(--paper-light);
+    background: var(--violet);
+
+    font-size: 0.63rem;
+    font-weight: 700;
+    letter-spacing: 0.055em;
+    text-transform: uppercase;
+}
+
+.semantic-graph-summary {
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.semantic-graph-legend {
+    display: flex;
+    flex-flow: row wrap;
+    gap: 0.8rem;
+    align-items: center;
+
+    padding: 0.5rem 0.7rem;
+
+    border-bottom: var(--border);
+
+    color: var(--muted);
+
+    font-size: 0.58rem;
+    text-transform: uppercase;
+}
+
+.semantic-graph-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.semantic-graph-legend-item::before {
+    content: "";
+
+    display: inline-block;
+
+    width: 11px;
+    height: 11px;
+
+    border: 1px solid var(--ink);
+}
+
+.semantic-graph-legend-query-a::before {
+    background: var(--violet);
+}
+
+.semantic-graph-legend-query-b::before {
+    background: var(--blue);
+}
+
+.semantic-graph-legend-intersection::before {
+    background: var(--green);
+}
+
+.semantic-graph-legend-only-a::before {
+    background: var(--violet);
+}
+
+.semantic-graph-legend-only-b::before {
+    background: var(--blue);
+}
+
+.semantic-graph-container {
+    position: relative;
+}
+
+#semantic-graph {
+    display: block;
+
+    width: 100%;
+    height: auto;
+
+    background: var(--paper-light);
+}
+
+.semantic-graph-background {
+    fill: var(--paper-light);
+}
+
+.semantic-graph-edge {
+    stroke: var(--ink);
+    stroke-width: 1;
+    stroke-opacity: 0.35;
+}
+
+.semantic-graph-edge-query-a {
+    stroke: var(--violet);
+    stroke-dasharray: 3 3;
+    stroke-opacity: 0.55;
+}
+
+.semantic-graph-edge-query-b {
+    stroke: var(--blue);
+    stroke-dasharray: 3 3;
+    stroke-opacity: 0.55;
+}
+
+.semantic-graph-query-node circle {
+    fill: var(--violet);
+    stroke: var(--ink);
+    stroke-width: 1.5;
+}
+
+.semantic-graph-query-node-a circle {
+    fill: var(--violet);
+}
+
+.semantic-graph-query-node-b circle {
+    fill: var(--blue);
+}
+
+.semantic-graph-query-label {
+    fill: var(--ink);
+
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-anchor: middle;
+    text-transform: uppercase;
+}
+
+.semantic-graph-node-frame {
+    fill: var(--paper);
+    stroke: var(--ink);
+    stroke-width: 1.4;
+}
+
+.semantic-graph-node-frame-both {
+    fill: var(--green);
+    stroke-width: 2.8;
+}
+
+.semantic-graph-node-frame-a {
+    fill: var(--violet);
+}
+
+.semantic-graph-node-frame-b {
+    fill: var(--blue);
+}
+
+.semantic-graph-node {
+    cursor: grab;
+
+    touch-action: none;
+}
+
+.semantic-graph-node:active {
+    cursor: grabbing;
+}
+
+.semantic-graph-node:focus {
+    outline: none;
+}
+
+.semantic-graph-node:hover
+.semantic-graph-node-frame,
+.semantic-graph-node:focus
+.semantic-graph-node-frame {
+    stroke: var(--violet);
+    stroke-width: 2.6;
+}
+
+.semantic-graph-hitbox {
+    fill: transparent;
+    pointer-events: all;
+}
+
+.semantic-graph-tooltip {
+    position: absolute;
+    z-index: 10;
+
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+
+    max-width: 260px;
+    padding: 0.55rem 0.65rem;
+
+    border: var(--border);
+
+    color: var(--paper-light);
+    background: var(--ink);
+
+    font-size: 0.6rem;
+    line-height: 1.35;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+
+    opacity: 0;
+    pointer-events: none;
+
+    transition:
+        opacity 120ms linear;
+}
+
+.semantic-graph-tooltip.visible {
+    opacity: 1;
+}
+
+.semantic-graph-tooltip strong {
+    color: var(--yellow);
+}
+
+@media (max-width: 700px) {
+    .semantic-graph-controls {
+        grid-template-columns:
+            repeat(2, minmax(140px, 1fr));
+    }
+}
+
+@media (max-width: 470px) {
+    .semantic-graph-controls {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .semantic-graph-tooltip {
+        transition: none;
+    }
+}
+
+.semantic-membership {
+    display: inline-block;
+
+    margin-bottom: 0.2rem;
+    padding: 0.08rem 0.35rem;
+
+    border: 1px solid var(--ink);
+
+    color: var(--paper-light);
+
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.semantic-membership-both {
+    background: var(--green);
+}
+
+.semantic-membership-a {
+    background: var(--violet);
+}
+
+.semantic-membership-b {
+    background: var(--blue);
 }
 
 /* ==========================================================

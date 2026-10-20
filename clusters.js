@@ -1438,6 +1438,22 @@ function initializeClusterExplorer(
                     hitbox
                 );
 
+                if (
+                    typeof window
+                        .createSimilarSvgButton
+                    === "function"
+                    && item.crop_image
+                ) {
+                    window.createSimilarSvgButton(
+                        group,
+                        centerX + 13,
+                        centerY - 13,
+                        () => window.findSimilarImages(
+                            item.crop_image
+                        )
+                    );
+                }
+
                 mark = group;
 
             } else {
@@ -1839,14 +1855,21 @@ function initializeClusterExplorer(
             ) {
                 const card =
                     document.createElement(
-                        "button"
+                        "div"
                     );
-
-                card.type =
-                    "button";
 
                 card.className =
                     "cluster-example-card";
+
+                card.setAttribute(
+                    "role",
+                    "button"
+                );
+
+                card.setAttribute(
+                    "tabindex",
+                    "0"
+                );
 
                 const image =
                     item.crop_image
@@ -1873,11 +1896,41 @@ function initializeClusterExplorer(
                             </span>
                         `;
 
+                const similarButton =
+                    item.crop_image
+                        ? `
+                            <button
+                                class="similar-image-button"
+                                type="button"
+                                title="Find similar images"
+                                aria-label="Find similar images"
+                            >
+                                <svg
+                                    viewBox="0 0 16 16"
+                                    aria-hidden="true"
+                                >
+                                    <circle
+                                        cx="7"
+                                        cy="7"
+                                        r="4.6"
+                                    ></circle>
+                                    <line
+                                        x1="10.4"
+                                        y1="10.4"
+                                        x2="14.5"
+                                        y2="14.5"
+                                    ></line>
+                                </svg>
+                            </button>
+                        `
+                        : "";
+
                 card.innerHTML = `
                     <span
                         class="cluster-example-image"
                     >
                         ${image}
+                        ${similarButton}
                     </span>
 
                     <span
@@ -1920,6 +1973,58 @@ function initializeClusterExplorer(
                         );
                     }
                 );
+
+                card.addEventListener(
+                    "keydown",
+                    event => {
+                        if (
+                            event.key === "Enter"
+                            || event.key === " "
+                        ) {
+                            event.preventDefault();
+
+                            openClusterModal(
+                                item
+                            );
+                        }
+                    }
+                );
+
+                const similar =
+                    card.querySelector(
+                        ".similar-image-button"
+                    );
+
+                if (similar) {
+                    similar.addEventListener(
+                        "click",
+                        event => {
+                            event.stopPropagation();
+
+                            if (
+                                typeof window
+                                    .findSimilarImages
+                                === "function"
+                            ) {
+                                window.findSimilarImages(
+                                    item.crop_image
+                                );
+                            }
+                        }
+                    );
+
+                    similar.addEventListener(
+                        "keydown",
+                        event => {
+                            if (
+                                event.key === "Enter"
+                                || event.key === " "
+                            ) {
+                                event.stopPropagation();
+                            }
+                        }
+                    );
+                }
 
                 grid.appendChild(
                     card

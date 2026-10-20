@@ -855586,7 +855586,8 @@
       "mAP50_95_caixa": 0.8340740399258362,
       "precisao_caixa": 0.9411203204931455,
       "recall_caixa": 0.9572649572649573,
-      "pesos_melhor_modelo": "/Users/luanamoraescosta/DH/ilustracao/finetune/runs/detect/runs_jornal/layout_jornal_det/weights/best.pt"
+      "pesos_melhor_modelo": "/Users/luanamoraescosta/DH/ilustracao/finetune/runs/detect/runs_jornal/layout_jornal_det/weights/best.pt",
+      "imgsz_treinamento": 640
     },
     "diagnostics": {
       "confusion_matrix.png": "dashboard_assets/diagnostics/confusion_matrix.png",

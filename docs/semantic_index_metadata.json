@@ -1,9 +1,9 @@
 {
-  "created_at": "2026-10-06T18:15:19.144022+00:00",
+  "created_at": "2026-10-20T13:12:35.532131+00:00",
   "model": {
     "family": "SigLIP2",
-    "python_model": "openai/clip-vit-base-patch32",
-    "browser_model": "Xenova/clip-vit-base-patch32",
+    "python_model": "openai/clip-vit-base-patch16",
+    "browser_model": "Xenova/clip-vit-base-patch16",
     "dimension": 512,
     "normalization": "L2",
     "binary_dtype": "float32-little-endian"

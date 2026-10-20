@@ -45,11 +45,11 @@ from transformers import AutoModel, AutoProcessor
 # ============================================================
 
 PYTHON_MODEL_ID = (
-    "openai/clip-vit-base-patch32"
+    "openai/clip-vit-base-patch16"
 )
 
 BROWSER_MODEL_ID = (
-    "Xenova/clip-vit-base-patch32"
+    "Xenova/clip-vit-base-patch16"
 )
 
 DEFAULT_BATCH_SIZE = 8

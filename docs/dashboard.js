@@ -447,9 +447,39 @@ function initializeGallery(originalData) {
                     </div>
                 `;
 
+            const similarButton =
+                item.crop_image
+                    ? `
+                        <button
+                            class="similar-image-button"
+                            type="button"
+                            title="Find similar images"
+                            aria-label="Find similar images"
+                        >
+                            <svg
+                                viewBox="0 0 16 16"
+                                aria-hidden="true"
+                            >
+                                <circle
+                                    cx="7"
+                                    cy="7"
+                                    r="4.6"
+                                ></circle>
+                                <line
+                                    x1="10.4"
+                                    y1="10.4"
+                                    x2="14.5"
+                                    y2="14.5"
+                                ></line>
+                            </svg>
+                        </button>
+                    `
+                    : "";
+
             card.innerHTML = `
                 <div class="gallery-image-container">
                     ${image}
+                    ${similarButton}
 
                     <span class="confidence-badge">
                         ${confidence}
@@ -494,6 +524,42 @@ function initializeGallery(originalData) {
                     }
                 }
             );
+
+            const similar =
+                card.querySelector(
+                    ".similar-image-button"
+                );
+
+            if (similar) {
+                similar.addEventListener(
+                    "click",
+                    event => {
+                        event.stopPropagation();
+
+                        if (
+                            typeof window
+                                .findSimilarImages
+                            === "function"
+                        ) {
+                            window.findSimilarImages(
+                                item.crop_image
+                            );
+                        }
+                    }
+                );
+
+                similar.addEventListener(
+                    "keydown",
+                    event => {
+                        if (
+                            event.key === "Enter"
+                            || event.key === " "
+                        ) {
+                            event.stopPropagation();
+                        }
+                    }
+                );
+            }
 
             fragment.appendChild(card);
         }

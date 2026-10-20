@@ -32,6 +32,14 @@ const MODEL_DTYPE = "q8";
 let searchMetadata = null;
 let searchEmbeddings = null;
 
+/*
+ * Full per-query rankings are cached by the query vector
+ * reference. The dot-product pass over the whole index is the
+ * expensive step (13,944 images); filtering by year, confidence
+ * and limit is cheap on top of a cached ranking.
+ */
+const rankingCache = new Map();
+
 let tokenizer = null;
 let processor = null;
 
@@ -1003,9 +1011,346 @@ async function encodeImage(file) {
 }
 
 
+async function encodeImageFromUrl(url) {
+    await loadVisionEncoder();
+
+    const rawImage =
+        await RawImage.fromURL(
+            url
+        );
+
+    const inputs =
+        await processor(
+            rawImage
+        );
+
+    const output =
+        await visionModel(
+            inputs
+        );
+
+    const vector =
+        extractProjectedEmbedding(
+            output,
+            [
+                "image_embeds",
+                "pooler_output"
+            ]
+        );
+
+    normalizeVector(
+        vector
+    );
+
+    validateQueryDimension(
+        vector
+    );
+
+    return vector;
+}
+
+
 /* ==========================================================
-   VECTOR NORMALIZATION
+   FIND SIMILAR IMAGES
    ========================================================== */
+
+function createSimilarSvgButton(
+    parent,
+    x,
+    y,
+    onClick
+) {
+    const namespace =
+        "http://www.w3.org/2000/svg";
+
+    const group =
+        document.createElementNS(
+            namespace,
+            "g"
+        );
+
+    group.setAttribute(
+        "class",
+        "similar-svg-button"
+    );
+
+    const background =
+        document.createElementNS(
+            namespace,
+            "circle"
+        );
+
+    background.setAttribute(
+        "cx",
+        String(x)
+    );
+
+    background.setAttribute(
+        "cy",
+        String(y)
+    );
+
+    background.setAttribute(
+        "r",
+        "10"
+    );
+
+    background.setAttribute(
+        "class",
+        "similar-svg-bg"
+    );
+
+    const magnifier =
+        document.createElementNS(
+            namespace,
+            "g"
+        );
+
+    magnifier.setAttribute(
+        "class",
+        "similar-svg-mag"
+    );
+
+    const lens =
+        document.createElementNS(
+            namespace,
+            "circle"
+        );
+
+    lens.setAttribute(
+        "cx",
+        String(x - 1.6)
+    );
+
+    lens.setAttribute(
+        "cy",
+        String(y - 1.6)
+    );
+
+    lens.setAttribute(
+        "r",
+        "4.4"
+    );
+
+    lens.setAttribute(
+        "class",
+        "similar-svg-lens"
+    );
+
+    const handle =
+        document.createElementNS(
+            namespace,
+            "line"
+        );
+
+    handle.setAttribute(
+        "x1",
+        String(x + 1.4)
+    );
+
+    handle.setAttribute(
+        "y1",
+        String(y + 1.4)
+    );
+
+    handle.setAttribute(
+        "x2",
+        String(x + 5.4)
+    );
+
+    handle.setAttribute(
+        "y2",
+        String(y + 5.4)
+    );
+
+    handle.setAttribute(
+        "class",
+        "similar-svg-handle"
+    );
+
+    magnifier.appendChild(
+        lens
+    );
+
+    magnifier.appendChild(
+        handle
+    );
+
+    group.appendChild(
+        background
+    );
+
+    group.appendChild(
+        magnifier
+    );
+
+    parent.appendChild(
+        group
+    );
+
+    group.addEventListener(
+        "pointerdown",
+        event => {
+            event.stopPropagation();
+        }
+    );
+
+    group.addEventListener(
+        "pointerup",
+        event => {
+            event.stopPropagation();
+        }
+    );
+
+    group.addEventListener(
+        "click",
+        event => {
+            event.stopPropagation();
+            event.preventDefault();
+
+            onClick();
+        }
+    );
+
+    group.addEventListener(
+        "keydown",
+        event => {
+            if (
+                event.key === "Enter"
+                || event.key === " "
+            ) {
+                event.preventDefault();
+                event.stopPropagation();
+
+                onClick();
+            }
+        }
+    );
+
+    return group;
+}
+
+
+async function findSimilarImages(url) {
+    if (!url) {
+        return;
+    }
+
+    const modeElement =
+        document.getElementById(
+            "semantic-mode"
+        );
+
+    if (modeElement) {
+        modeElement.value =
+            "image";
+    }
+
+    updateSearchMode();
+
+    const preview =
+        document.getElementById(
+            "semantic-upload-preview"
+        );
+
+    if (preview) {
+        preview.innerHTML = `
+            <img
+                src="${escapeHtml(
+                    url
+                )}"
+                alt="Similar image query"
+            />
+        `;
+    }
+
+    if (
+        selectedImageURL
+        && selectedImageURL.startsWith(
+            "blob:"
+        )
+    ) {
+        URL.revokeObjectURL(
+            selectedImageURL
+        );
+    }
+
+    selectedImageFile = null;
+    selectedImageURL = url;
+
+    try {
+        await runImageSearch();
+    } finally {
+        scrollToSemanticResults();
+    }
+}
+
+
+function scrollToSemanticResults() {
+    const section =
+        document.getElementById(
+            "semantic-search"
+        );
+
+    if (!section) {
+        return;
+    }
+
+    const scrollAndFlash = () => {
+        section.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+        });
+
+        const intro =
+            section.querySelector(
+                ".semantic-search-intro"
+            )
+            || section;
+
+        intro.classList.add(
+            "semantic-results-flash"
+        );
+
+        window.setTimeout(
+            () => {
+                intro.classList.remove(
+                    "semantic-results-flash"
+                );
+            },
+            1400
+        );
+    };
+
+    if (section.classList.contains("show")) {
+        scrollAndFlash();
+        return;
+    }
+
+    const tabEl =
+        document.getElementById(
+            "tab-semantic-search"
+        );
+
+    if (!tabEl) {
+        scrollAndFlash();
+        return;
+    }
+
+    tabEl.addEventListener(
+        "shown.bs.tab",
+        scrollAndFlash,
+        { once: true }
+    );
+
+    tabEl.click();
+}
+
+window.findSimilarImages =
+    findSimilarImages;
+
+window.createSimilarSvgButton =
+    createSimilarSvgButton;
 
 function normalizeVector(vector) {
     let norm = 0;
@@ -1051,11 +1396,8 @@ function normalizeVector(vector) {
    VECTOR SEARCH
    ========================================================== */
 
-function searchIndex(
-    queryVector,
-    selectedYear,
-    minimumConfidence,
-    limit
+function computeFullRanking(
+    queryVector
 ) {
     const dimension = Number(
         searchMetadata
@@ -1079,23 +1421,6 @@ function searchIndex(
             searchMetadata.items[
                 itemIndex
             ];
-
-        if (
-            selectedYear
-            && String(
-                item.year
-            ) !== selectedYear
-        ) {
-            continue;
-        }
-
-        if (
-            Number(
-                item.confidence
-            ) < minimumConfidence
-        ) {
-            continue;
-        }
 
         const offset =
             itemIndex
@@ -1126,6 +1451,8 @@ function searchIndex(
 
         results.push({
             ...item,
+            item_index:
+                itemIndex,
             semantic_score:
                 score
         });
@@ -1137,10 +1464,75 @@ function searchIndex(
             - first.semantic_score
     );
 
-    return results.slice(
-        0,
-        limit
-    );
+    return results;
+}
+
+
+function searchIndex(
+    queryVector,
+    selectedYear,
+    minimumConfidence,
+    limit
+) {
+    let ranking =
+        rankingCache.get(
+            queryVector
+        );
+
+    if (!ranking) {
+        ranking =
+            computeFullRanking(
+                queryVector
+            );
+
+        if (
+            rankingCache.size >= 24
+        ) {
+            const oldest =
+                rankingCache.keys()
+                    .next().value;
+
+            rankingCache.delete(
+                oldest
+            );
+        }
+
+        rankingCache.set(
+            queryVector,
+            ranking
+        );
+    }
+
+    const results = [];
+
+    for (const result of ranking) {
+        if (
+            selectedYear
+            && String(
+                result.year
+            ) !== selectedYear
+        ) {
+            continue;
+        }
+
+        if (
+            Number(
+                result.confidence
+            ) < minimumConfidence
+        ) {
+            continue;
+        }
+
+        results.push(result);
+
+        if (
+            results.length >= limit
+        ) {
+            break;
+        }
+    }
+
+    return results;
 }
 
 
@@ -1281,7 +1673,10 @@ async function runImageSearch() {
             "semantic-status"
         );
 
-    if (!selectedImageFile) {
+    if (
+        !selectedImageFile
+        && !selectedImageURL
+    ) {
         status.textContent =
             "Select an image first.";
 
@@ -1296,9 +1691,13 @@ async function runImageSearch() {
             + "with CLIP…";
 
         const vector =
-            await encodeImage(
-                selectedImageFile
-            );
+            selectedImageFile
+                ? await encodeImage(
+                    selectedImageFile
+                )
+                : await encodeImageFromUrl(
+                    selectedImageURL
+                );
 
         const options =
             currentSearchOptions();
@@ -1377,14 +1776,21 @@ function renderResults(
         ) => {
             const card =
                 document.createElement(
-                    "button"
+                    "div"
                 );
-
-            card.type =
-                "button";
 
             card.className =
                 "semantic-result-card";
+
+            card.setAttribute(
+                "role",
+                "button"
+            );
+
+            card.setAttribute(
+                "tabindex",
+                "0"
+            );
 
             const score =
                 Number(
@@ -1413,6 +1819,62 @@ function renderResults(
                         </span>
                     `;
 
+            const membershipMap = {
+                both: {
+                    label: "SHARED",
+                    className: "semantic-membership-both"
+                },
+                a: {
+                    label: "ONLY A",
+                    className: "semantic-membership-a"
+                },
+                b: {
+                    label: "ONLY B",
+                    className: "semantic-membership-b"
+                }
+            };
+
+            const membership =
+                membershipMap[item.membership];
+
+            const membershipMarkup =
+                membership
+                    ? `
+                        <span class="semantic-membership ${membership.className}">
+                            ${membership.label}
+                        </span>
+                    `
+                    : "";
+
+            const similarButton =
+                item.crop_image
+                    ? `
+                        <button
+                            class="similar-image-button"
+                            type="button"
+                            title="Find similar images"
+                            aria-label="Find similar images"
+                        >
+                            <svg
+                                viewBox="0 0 16 16"
+                                aria-hidden="true"
+                            >
+                                <circle
+                                    cx="7"
+                                    cy="7"
+                                    r="4.6"
+                                ></circle>
+                                <line
+                                    x1="10.4"
+                                    y1="10.4"
+                                    x2="14.5"
+                                    y2="14.5"
+                                ></line>
+                            </svg>
+                        </button>
+                    `
+                    : "";
+
             card.innerHTML = `
                 <span class="semantic-rank">
                     ${String(
@@ -1422,9 +1884,12 @@ function renderResults(
 
                 <span class="semantic-image">
                     ${imageMarkup}
+                    ${similarButton}
                 </span>
 
                 <span class="semantic-result-data">
+
+                    ${membershipMarkup}
 
                     <strong>
                         SIMILARITY
@@ -1466,6 +1931,53 @@ function renderResults(
                 }
             );
 
+            card.addEventListener(
+                "keydown",
+                event => {
+                    if (
+                        event.key === "Enter"
+                        || event.key === " "
+                    ) {
+                        event.preventDefault();
+
+                        openModal(
+                            item,
+                            queryLabel
+                        );
+                    }
+                }
+            );
+
+            const similar =
+                card.querySelector(
+                    ".similar-image-button"
+                );
+
+            if (similar) {
+                similar.addEventListener(
+                    "click",
+                    event => {
+                        event.stopPropagation();
+
+                        findSimilarImages(
+                            item.crop_image
+                        );
+                    }
+                );
+
+                similar.addEventListener(
+                    "keydown",
+                    event => {
+                        if (
+                            event.key === "Enter"
+                            || event.key === " "
+                        ) {
+                            event.stopPropagation();
+                        }
+                    }
+                );
+            }
+
             fragment.appendChild(
                 card
             );
@@ -1498,6 +2010,21 @@ function updateSearchMode() {
             "semantic-image-panel"
         );
 
+    const graphPanel =
+        document.getElementById(
+            "semantic-graph-panel"
+        );
+
+    const graphWrap =
+        document.getElementById(
+            "semantic-graph-wrap"
+        );
+
+    const limitControl =
+        document.getElementById(
+            "semantic-limit-control"
+        );
+
     if (
         !modeElement
         || !textPanel
@@ -1514,6 +2041,23 @@ function updateSearchMode() {
 
     imagePanel.hidden =
         mode !== "image";
+
+    if (graphPanel) {
+        graphPanel.hidden =
+            mode !== "graph";
+    }
+
+    if (limitControl) {
+        limitControl.hidden =
+            mode === "graph";
+    }
+
+    if (
+        graphWrap
+        && mode !== "graph"
+    ) {
+        graphWrap.hidden = true;
+    }
 }
 
 
@@ -1773,6 +2317,92 @@ function connectControls() {
                 );
             }
         );
+
+    const graphButton =
+        document.getElementById(
+            "semantic-graph-search-button"
+        );
+
+    const graphQueryA =
+        document.getElementById(
+            "semantic-query-a"
+        );
+
+    const graphQueryB =
+        document.getElementById(
+            "semantic-query-b"
+        );
+
+    const graphLimit =
+        document.getElementById(
+            "semantic-graph-limit"
+        );
+
+    const graphLinks =
+        document.getElementById(
+            "semantic-graph-show-query-links"
+        );
+
+    if (graphButton) {
+        graphButton.addEventListener(
+            "click",
+            runIntersectionGraph
+        );
+    }
+
+    for (const graphInput of [
+        graphQueryA,
+        graphQueryB
+    ]) {
+        if (graphInput) {
+            graphInput.addEventListener(
+                "keydown",
+                event => {
+                    if (
+                        event.key === "Enter"
+                    ) {
+                        runIntersectionGraph();
+                    }
+                }
+            );
+        }
+    }
+
+    for (const graphControl of [
+        graphLimit,
+        graphLinks
+    ]) {
+        if (graphControl) {
+            graphControl.addEventListener(
+                "change",
+                refreshGraphFromControls
+            );
+        }
+    }
+
+    const yearElement =
+        document.getElementById(
+            "semantic-year"
+        );
+
+    if (yearElement) {
+        yearElement.addEventListener(
+            "change",
+            refreshGraphFromControls
+        );
+    }
+
+    const confidenceElement =
+        document.getElementById(
+            "semantic-confidence"
+        );
+
+    if (confidenceElement) {
+        confidenceElement.addEventListener(
+            "change",
+            refreshGraphFromControls
+        );
+    }
 
     const modal =
         document.getElementById(
@@ -2064,6 +2694,1379 @@ function escapeHtml(value) {
             "'",
             "&#039;"
         );
+}
+
+
+/* ==========================================================
+   QUERY INTERSECTION GRAPH
+   ========================================================== */
+
+const GRAPH_VIEWBOX_WIDTH = 1000;
+const GRAPH_VIEWBOX_HEIGHT = 620;
+const GRAPH_NODE_SIZE = 46;
+const GRAPH_IMAGE_SIZE = 38;
+const GRAPH_HITBOX_SIZE = 48;
+
+let currentGraphState = null;
+let graphRefreshTimeout = null;
+
+
+function getItemEmbedding(itemIndex) {
+    const dimension = Number(
+        searchMetadata.model.dimension
+    );
+
+    const offset = itemIndex * dimension;
+
+    return searchEmbeddings.subarray(
+        offset,
+        offset + dimension
+    );
+}
+
+
+function vectorDotProduct(first, second) {
+    let dot = 0;
+
+    for (
+        let index = 0;
+        index < first.length;
+        index += 1
+    ) {
+        dot += first[index] * second[index];
+    }
+
+    return dot;
+}
+
+
+function hashString(value) {
+    let hash = 0;
+
+    for (
+        let index = 0;
+        index < value.length;
+        index += 1
+    ) {
+        hash = (
+            hash * 31
+            + value.charCodeAt(index)
+        ) >>> 0;
+    }
+
+    return hash;
+}
+
+
+function currentGraphOptions() {
+    const limitElement =
+        document.getElementById(
+            "semantic-graph-limit"
+        );
+
+    const linksElement =
+        document.getElementById(
+            "semantic-graph-show-query-links"
+        );
+
+    const searchOptions =
+        currentSearchOptions();
+
+    return {
+        limit:
+            limitElement
+                ? Number(
+                    limitElement.value
+                )
+                : 24,
+
+        showQueryLinks:
+            linksElement
+                ? linksElement.checked
+                : true,
+
+        year:
+            searchOptions.year,
+
+        confidence:
+            searchOptions.confidence
+    };
+}
+
+
+function queryLabel(text) {
+    const cleaned = String(
+        text ?? ""
+    ).trim();
+
+    if (cleaned.length <= 24) {
+        return cleaned;
+    }
+
+    return `${cleaned.slice(0, 23)}…`;
+}
+
+
+function buildIntersectionGraph(
+    queryA,
+    queryB,
+    options
+) {
+    const resultsA =
+        searchIndex(
+            queryA.vector,
+            options.year,
+            options.confidence,
+            options.limit
+        );
+
+    const resultsB =
+        searchIndex(
+            queryB.vector,
+            options.year,
+            options.confidence,
+            options.limit
+        );
+
+    const idsB = new Set(
+        resultsB.map(
+            result => result.id
+        )
+    );
+
+    const intersection =
+        resultsA.filter(
+            result => idsB.has(result.id)
+        );
+
+    const intersectionIds =
+        new Set(
+            intersection.map(
+                result => result.id
+            )
+        );
+
+    const unionById = new Map();
+
+    for (const result of resultsA) {
+        unionById.set(
+            result.id,
+            {
+                item: result,
+                membership:
+                    intersectionIds.has(
+                        result.id
+                    )
+                        ? "both"
+                        : "a"
+            }
+        );
+    }
+
+    for (const result of resultsB) {
+        const existing =
+            unionById.get(result.id);
+
+        if (existing) {
+            existing.membership =
+                "both";
+        } else {
+            unionById.set(
+                result.id,
+                {
+                    item: result,
+                    membership: "b"
+                }
+            );
+        }
+    }
+
+    const nodes = [];
+
+    nodes.push({
+        id: "query-A",
+        kind: "query",
+        label: queryLabel(queryA.text),
+        fixed: true
+    });
+
+    nodes.push({
+        id: "query-B",
+        kind: "query",
+        label: queryLabel(queryB.text),
+        fixed: true
+    });
+
+    for (const [id, info] of unionById) {
+        nodes.push({
+            id,
+            kind: "image",
+            item: info.item,
+            membership: info.membership
+        });
+    }
+
+    const edges = [];
+
+    if (options.showQueryLinks) {
+        for (const result of resultsA) {
+            edges.push({
+                source: "query-A",
+                target: result.id,
+                kind: "query-a"
+            });
+        }
+
+        for (const result of resultsB) {
+            edges.push({
+                source: "query-B",
+                target: result.id,
+                kind: "query-b"
+            });
+        }
+    }
+
+    const membershipOrder = {
+        both: 0,
+        a: 1,
+        b: 2
+    };
+
+    const union =
+        Array.from(
+            unionById.values()
+        ).map(info => ({
+            ...info.item,
+            membership: info.membership
+        })).sort(
+            (first, second) => {
+                const membershipDiff =
+                    membershipOrder[first.membership]
+                    - membershipOrder[second.membership];
+
+                if (membershipDiff !== 0) {
+                    return membershipDiff;
+                }
+
+                return (
+                    Number(second.semantic_score)
+                    - Number(first.semantic_score)
+                );
+            }
+        );
+
+    return {
+        nodes,
+        edges,
+        intersection,
+        union
+    };
+}
+
+
+function membershipAnchor(
+    node,
+    width,
+    height
+) {
+    if (node.membership === "a") {
+        return {
+            x: width * 0.33,
+            y: height * 0.5
+        };
+    }
+
+    if (node.membership === "b") {
+        return {
+            x: width * 0.67,
+            y: height * 0.5
+        };
+    }
+
+    return {
+        x: width * 0.5,
+        y: height * 0.5
+    };
+}
+
+
+function simulateGraphLayout(
+    nodes,
+    edges,
+    width,
+    height
+) {
+    const movable =
+        nodes.filter(
+            node => !node.fixed
+        );
+
+    const count = Math.max(
+        movable.length,
+        1
+    );
+
+    const area = width * height;
+
+    const ideal =
+        Math.sqrt(
+            area / count
+        ) * 0.85;
+
+    for (const node of movable) {
+        const seed = hashString(
+            node.id
+        );
+
+        const seedX =
+            (seed % 1000) / 1000;
+
+        const seedY =
+            ((seed >>> 10) % 1000) / 1000;
+
+        node.x =
+            width / 2
+            + (seedX - 0.5) * width * 0.4;
+
+        node.y =
+            height / 2
+            + (seedY - 0.5) * height * 0.4;
+
+        node.vx = 0;
+        node.vy = 0;
+    }
+
+    for (const node of nodes) {
+        if (node.id === "query-A") {
+            node.x = 120;
+            node.y = height / 2;
+        } else if (node.id === "query-B") {
+            node.x = width - 120;
+            node.y = height / 2;
+        }
+    }
+
+    const nodeById = new Map();
+
+    for (const node of nodes) {
+        nodeById.set(node.id, node);
+    }
+
+    const iterations = Math.max(
+        70,
+        Math.min(
+            280,
+            Math.round(
+                280 - movable.length * 1.5
+            )
+        )
+    );
+
+    for (
+        let iteration = 0;
+        iteration < iterations;
+        iteration += 1
+    ) {
+        const cooling =
+            1 - iteration / iterations;
+
+        for (
+            let first = 0;
+            first < movable.length;
+            first += 1
+        ) {
+            for (
+                let second = first + 1;
+                second < movable.length;
+                second += 1
+            ) {
+                const a = movable[first];
+                const b = movable[second];
+
+                let dx = a.x - b.x;
+                let dy = a.y - b.y;
+
+                let distance = Math.sqrt(
+                    dx * dx + dy * dy
+                );
+
+                if (distance < 1) {
+                    dx = 0.5;
+                    dy = 0.5;
+                    distance = 1;
+                }
+
+                const force =
+                    ideal * ideal / distance
+                    * 0.015 * cooling;
+
+                const fx =
+                    dx / distance * force;
+
+                const fy =
+                    dy / distance * force;
+
+                a.vx += fx;
+                a.vy += fy;
+                b.vx -= fx;
+                b.vy -= fy;
+            }
+        }
+
+        for (const edge of edges) {
+            const source =
+                nodeById.get(edge.source);
+
+            const target =
+                nodeById.get(edge.target);
+
+            if (!source || !target) {
+                continue;
+            }
+
+            let restLength = ideal;
+
+            if (
+                edge.kind === "query-a"
+                || edge.kind === "query-b"
+            ) {
+                restLength = ideal * 0.6;
+            } else {
+                restLength = ideal * 0.85;
+            }
+
+            let dx = target.x - source.x;
+            let dy = target.y - source.y;
+
+            const distance = Math.sqrt(
+                dx * dx + dy * dy
+            ) || 0.01;
+
+            const force =
+                (distance - restLength)
+                * 0.01 * cooling;
+
+            const fx = dx / distance * force;
+            const fy = dy / distance * force;
+
+            if (!source.fixed) {
+                source.vx += fx;
+                source.vy += fy;
+            }
+
+            if (!target.fixed) {
+                target.vx -= fx;
+                target.vy -= fy;
+            }
+        }
+
+        for (const node of movable) {
+            const anchor =
+                membershipAnchor(
+                    node,
+                    width,
+                    height
+                );
+
+            node.vx +=
+                (anchor.x - node.x)
+                * 0.10 * cooling;
+
+            node.vy +=
+                (anchor.y - node.y)
+                * 0.08 * cooling;
+
+            node.vx *= 0.86;
+            node.vy *= 0.86;
+
+            node.x += node.vx;
+            node.y += node.vy;
+
+            const margin =
+                GRAPH_HITBOX_SIZE / 2 + 8;
+
+            if (node.x < margin) {
+                node.x = margin;
+            } else if (
+                node.x > width - margin
+            ) {
+                node.x = width - margin;
+            }
+
+            if (node.y < margin) {
+                node.y = margin;
+            } else if (
+                node.y > height - margin
+            ) {
+                node.y = height - margin;
+            }
+        }
+    }
+
+    return nodes;
+}
+
+
+function showGraphTooltip(node) {
+    const tooltip =
+        document.getElementById(
+            "semantic-graph-tooltip"
+        );
+
+    if (!tooltip) {
+        return;
+    }
+
+    const item = node.item;
+
+    const confidence = Number(
+        item.confidence
+    );
+
+    tooltip.innerHTML = `
+        <strong>
+            ${escapeHtml(
+                item.year
+            )}
+            / PAGE ${escapeHtml(
+                item.page
+            )}
+        </strong>
+
+        <span>
+            SIMILARITY ${Number(
+                item.semantic_score
+            ).toFixed(3)}
+        </span>
+
+        <span>
+            YOLO ${Number.isFinite(confidence)
+                ? (confidence * 100).toFixed(1)
+                : "N/A"}%
+        </span>
+    `;
+
+    tooltip.classList.add("visible");
+}
+
+
+function hideGraphTooltip() {
+    const tooltip =
+        document.getElementById(
+            "semantic-graph-tooltip"
+        );
+
+    if (!tooltip) {
+        return;
+    }
+
+    tooltip.classList.remove("visible");
+}
+
+
+let graphDragState = null;
+
+
+function svgPointFromEvent(svg, event) {
+    const point =
+        svg.createSVGPoint();
+
+    point.x = event.clientX;
+    point.y = event.clientY;
+
+    const matrix =
+        svg.getScreenCTM();
+
+    if (!matrix) {
+        return null;
+    }
+
+    return point.matrixTransform(
+        matrix.inverse()
+    );
+}
+
+
+function updateGraphNodePosition(refs, node) {
+    const half =
+        GRAPH_NODE_SIZE / 2;
+
+    const imageHalf =
+        GRAPH_IMAGE_SIZE / 2;
+
+    const hitboxHalf =
+        GRAPH_HITBOX_SIZE / 2;
+
+    refs.frame.setAttribute(
+        "x",
+        String(node.x - half)
+    );
+    refs.frame.setAttribute(
+        "y",
+        String(node.y - half)
+    );
+    refs.image.setAttribute(
+        "x",
+        String(node.x - imageHalf)
+    );
+    refs.image.setAttribute(
+        "y",
+        String(node.y - imageHalf)
+    );
+    refs.hitbox.setAttribute(
+        "x",
+        String(node.x - hitboxHalf)
+    );
+    refs.hitbox.setAttribute(
+        "y",
+        String(node.y - hitboxHalf)
+    );
+}
+
+
+function updateGraphNodeEdges(id, node, svgEdges) {
+    for (const edge of svgEdges) {
+        if (edge.source === id) {
+            edge.element.setAttribute(
+                "x1",
+                String(node.x)
+            );
+            edge.element.setAttribute(
+                "y1",
+                String(node.y)
+            );
+        } else if (
+            edge.target === id
+        ) {
+            edge.element.setAttribute(
+                "x2",
+                String(node.x)
+            );
+            edge.element.setAttribute(
+                "y2",
+                String(node.y)
+            );
+        }
+    }
+}
+
+
+function renderIntersectionGraph(graph) {
+    const svg =
+        document.getElementById(
+            "semantic-graph"
+        );
+
+    if (!svg) {
+        return;
+    }
+
+    const namespace =
+        "http://www.w3.org/2000/svg";
+
+    svg.innerHTML = "";
+
+    const nodes =
+        simulateGraphLayout(
+            graph.nodes,
+            graph.edges,
+            GRAPH_VIEWBOX_WIDTH,
+            GRAPH_VIEWBOX_HEIGHT
+        );
+
+    const nodeById = new Map();
+
+    for (const node of nodes) {
+        nodeById.set(node.id, node);
+    }
+
+    const svgNodes = new Map();
+
+    const svgEdges = [];
+
+    const fragment =
+        document.createDocumentFragment();
+
+    const background =
+        document.createElementNS(
+            namespace,
+            "rect"
+        );
+
+    background.setAttribute(
+        "x",
+        "0"
+    );
+    background.setAttribute(
+        "y",
+        "0"
+    );
+    background.setAttribute(
+        "width",
+        String(GRAPH_VIEWBOX_WIDTH)
+    );
+    background.setAttribute(
+        "height",
+        String(GRAPH_VIEWBOX_HEIGHT)
+    );
+    background.setAttribute(
+        "class",
+        "semantic-graph-background"
+    );
+
+    fragment.appendChild(background);
+
+    for (const edge of graph.edges) {
+        const source =
+            nodeById.get(edge.source);
+
+        const target =
+            nodeById.get(edge.target);
+
+        if (!source || !target) {
+            continue;
+        }
+
+        const line =
+            document.createElementNS(
+                namespace,
+                "line"
+            );
+
+        line.setAttribute(
+            "x1",
+            String(source.x)
+        );
+        line.setAttribute(
+            "y1",
+            String(source.y)
+        );
+        line.setAttribute(
+            "x2",
+            String(target.x)
+        );
+        line.setAttribute(
+            "y2",
+            String(target.y)
+        );
+
+        line.setAttribute(
+            "class",
+            "semantic-graph-edge "
+            + `semantic-graph-edge-${edge.kind}`
+        );
+
+        svgEdges.push({
+            element: line,
+            source: edge.source,
+            target: edge.target
+        });
+
+        fragment.appendChild(line);
+    }
+
+    for (const node of nodes) {
+        if (node.kind !== "query") {
+            continue;
+        }
+
+        const group =
+            document.createElementNS(
+                namespace,
+                "g"
+            );
+
+        const queryClass =
+            node.id === "query-A"
+                ? "semantic-graph-query-node-a"
+                : "semantic-graph-query-node-b";
+
+        group.setAttribute(
+            "class",
+            "semantic-graph-query-node "
+            + queryClass
+        );
+
+        const circle =
+            document.createElementNS(
+                namespace,
+                "circle"
+            );
+
+        circle.setAttribute(
+            "cx",
+            String(node.x)
+        );
+        circle.setAttribute(
+            "cy",
+            String(node.y)
+        );
+        circle.setAttribute(
+            "r",
+            "22"
+        );
+
+        group.appendChild(circle);
+
+        const label =
+            document.createElementNS(
+                namespace,
+                "text"
+            );
+
+        label.setAttribute(
+            "x",
+            String(node.x)
+        );
+        label.setAttribute(
+            "y",
+            String(node.y + 44)
+        );
+        label.setAttribute(
+            "class",
+            "semantic-graph-query-label"
+        );
+
+        label.textContent =
+            node.label || "QUERY";
+
+        group.appendChild(label);
+
+        fragment.appendChild(group);
+    }
+
+    for (const node of nodes) {
+        if (node.kind !== "image") {
+            continue;
+        }
+
+        const group =
+            document.createElementNS(
+                namespace,
+                "g"
+            );
+
+        group.setAttribute(
+            "class",
+            "semantic-graph-node"
+        );
+        group.setAttribute(
+            "tabindex",
+            "0"
+        );
+        group.setAttribute(
+            "role",
+            "button"
+        );
+
+        const half =
+            GRAPH_NODE_SIZE / 2;
+
+        const frame =
+            document.createElementNS(
+                namespace,
+                "rect"
+            );
+
+        frame.setAttribute(
+            "x",
+            String(node.x - half)
+        );
+        frame.setAttribute(
+            "y",
+            String(node.y - half)
+        );
+        frame.setAttribute(
+            "width",
+            String(GRAPH_NODE_SIZE)
+        );
+        frame.setAttribute(
+            "height",
+            String(GRAPH_NODE_SIZE)
+        );
+        const membershipClass =
+            node.membership === "both"
+                ? "semantic-graph-node-frame-both"
+                : node.membership === "a"
+                    ? "semantic-graph-node-frame-a"
+                    : node.membership === "b"
+                        ? "semantic-graph-node-frame-b"
+                        : "semantic-graph-node-frame";
+
+        frame.setAttribute(
+            "class",
+            membershipClass
+        );
+
+        group.appendChild(frame);
+
+        const imageHalf =
+            GRAPH_IMAGE_SIZE / 2;
+
+        const image =
+            document.createElementNS(
+                namespace,
+                "image"
+            );
+
+        image.setAttribute(
+            "x",
+            String(node.x - imageHalf)
+        );
+        image.setAttribute(
+            "y",
+            String(node.y - imageHalf)
+        );
+        image.setAttribute(
+            "width",
+            String(GRAPH_IMAGE_SIZE)
+        );
+        image.setAttribute(
+            "height",
+            String(GRAPH_IMAGE_SIZE)
+        );
+        image.setAttribute(
+            "preserveAspectRatio",
+            "xMidYMid slice"
+        );
+
+        if (node.item.crop_image) {
+            image.setAttribute(
+                "href",
+                node.item.crop_image
+            );
+            image.setAttributeNS(
+                "http://www.w3.org/1999/xlink",
+                "href",
+                node.item.crop_image
+            );
+        }
+
+        group.appendChild(image);
+
+        const hitboxHalf =
+            GRAPH_HITBOX_SIZE / 2;
+
+        const hitbox =
+            document.createElementNS(
+                namespace,
+                "rect"
+            );
+
+        hitbox.setAttribute(
+            "x",
+            String(node.x - hitboxHalf)
+        );
+        hitbox.setAttribute(
+            "y",
+            String(node.y - hitboxHalf)
+        );
+        hitbox.setAttribute(
+            "width",
+            String(GRAPH_HITBOX_SIZE)
+        );
+        hitbox.setAttribute(
+            "height",
+            String(GRAPH_HITBOX_SIZE)
+        );
+        hitbox.setAttribute(
+            "class",
+            "semantic-graph-hitbox"
+        );
+
+        group.appendChild(hitbox);
+
+        if (node.item.crop_image) {
+            createSimilarSvgButton(
+                group,
+                node.x + half - 11,
+                node.y - half + 11,
+                () => findSimilarImages(
+                    node.item.crop_image
+                )
+            );
+        }
+
+        svgNodes.set(node.id, {
+            frame,
+            image,
+            hitbox
+        });
+
+        group.addEventListener(
+            "mouseenter",
+            () => showGraphTooltip(node)
+        );
+        group.addEventListener(
+            "mouseleave",
+            hideGraphTooltip
+        );
+        group.addEventListener(
+            "focus",
+            () => showGraphTooltip(node)
+        );
+        group.addEventListener(
+            "blur",
+            hideGraphTooltip
+        );
+        group.addEventListener(
+            "pointerdown",
+            event => {
+                event.preventDefault();
+
+                const point =
+                    svgPointFromEvent(
+                        svg,
+                        event
+                    );
+
+                if (!point) {
+                    return;
+                }
+
+                graphDragState = {
+                    id: node.id,
+                    startX: point.x,
+                    startY: point.y,
+                    moved: false
+                };
+
+                group.setPointerCapture(
+                    event.pointerId
+                );
+            }
+        );
+        group.addEventListener(
+            "pointermove",
+            event => {
+                if (
+                    !graphDragState
+                    || graphDragState.id !== node.id
+                ) {
+                    return;
+                }
+
+                const point =
+                    svgPointFromEvent(
+                        svg,
+                        event
+                    );
+
+                if (!point) {
+                    return;
+                }
+
+                const delta =
+                    Math.hypot(
+                        point.x - graphDragState.startX,
+                        point.y - graphDragState.startY
+                    );
+
+                if (
+                    !graphDragState.moved
+                    && delta < 4
+                ) {
+                    return;
+                }
+
+                graphDragState.moved = true;
+
+                node.x = point.x;
+                node.y = point.y;
+
+                const refs =
+                    svgNodes.get(node.id);
+
+                if (refs) {
+                    updateGraphNodePosition(
+                        refs,
+                        node
+                    );
+
+                    updateGraphNodeEdges(
+                        node.id,
+                        node,
+                        svgEdges
+                    );
+                }
+            }
+        );
+        group.addEventListener(
+            "pointerup",
+            event => {
+                const wasMoved =
+                    graphDragState
+                    && graphDragState.moved;
+
+                graphDragState = null;
+
+                if (!wasMoved) {
+                    openModal(
+                        node.item,
+                        "INTERSECTION / QUERY GRAPH"
+                    );
+                }
+            }
+        );
+        group.addEventListener(
+            "pointercancel",
+            () => {
+                graphDragState = null;
+            }
+        );
+        group.addEventListener(
+            "keydown",
+            event => {
+                if (
+                    event.key === "Enter"
+                    || event.key === " "
+                ) {
+                    event.preventDefault();
+
+                    openModal(
+                        node.item,
+                        "INTERSECTION / QUERY GRAPH"
+                    );
+                }
+            }
+        );
+
+        fragment.appendChild(group);
+    }
+
+    svg.appendChild(fragment);
+}
+
+
+function updateGraphSummary(graph, options) {
+    const summary =
+        document.getElementById(
+            "semantic-graph-summary"
+        );
+
+    if (!summary) {
+        return;
+    }
+
+    const shared =
+        graph.intersection.length;
+
+    let onlyA = 0;
+    let onlyB = 0;
+
+    for (const node of graph.nodes) {
+        if (node.kind !== "image") {
+            continue;
+        }
+
+        if (node.membership === "a") {
+            onlyA += 1;
+        } else if (
+            node.membership === "b"
+        ) {
+            onlyB += 1;
+        }
+    }
+
+    if (shared === 0) {
+        summary.textContent =
+            `QUERY A ∩ QUERY B — no shared images. `
+            + `Only in A: ${onlyA} · only in B: ${onlyB} `
+            + `(of ${options.limit} per query). `
+            + `Try two related queries (e.g. "church" and `
+            + `"cathedral", or "train" and "railway").`;
+
+        return;
+    }
+
+    summary.textContent =
+        `QUERY A ∩ QUERY B — ${shared} shared · `
+        + `only in A: ${onlyA} · only in B: ${onlyB} `
+        + `(of ${options.limit} per query).`;
+}
+
+
+async function runIntersectionGraph() {
+    const queryAElement =
+        document.getElementById(
+            "semantic-query-a"
+        );
+
+    const queryBElement =
+        document.getElementById(
+            "semantic-query-b"
+        );
+
+    const button =
+        document.getElementById(
+            "semantic-graph-search-button"
+        );
+
+    const status =
+        document.getElementById(
+            "semantic-status"
+        );
+
+    const queryA =
+        queryAElement
+            ? queryAElement.value.trim()
+            : "";
+
+    const queryB =
+        queryBElement
+            ? queryBElement.value.trim()
+            : "";
+
+    if (!queryA || !queryB) {
+        status.textContent =
+            "Enter both query A and query B.";
+
+        return;
+    }
+
+    if (button) {
+        button.disabled = true;
+    }
+
+    try {
+        status.textContent =
+            "Encoding both queries with CLIP…";
+
+        const [
+            vectorA,
+            vectorB
+        ] = await Promise.all([
+            encodeText(queryA),
+            encodeText(queryB)
+        ]);
+
+        const options =
+            currentGraphOptions();
+
+        const graph =
+            buildIntersectionGraph(
+                {
+                    vector: vectorA,
+                    text: queryA
+                },
+                {
+                    vector: vectorB,
+                    text: queryB
+                },
+                options
+            );
+
+        currentGraphState = {
+            queryA: {
+                vector: vectorA,
+                text: queryA
+            },
+            queryB: {
+                vector: vectorB,
+                text: queryB
+            },
+            options,
+            graph
+        };
+
+        const graphWrap =
+            document.getElementById(
+                "semantic-graph-wrap"
+            );
+
+        if (graphWrap) {
+            graphWrap.hidden = false;
+        }
+
+        renderIntersectionGraph(
+            graph
+        );
+
+        updateGraphSummary(
+            graph,
+            options
+        );
+
+        renderResults(
+            graph.union,
+            `UNION / ${queryA} ∩ ${queryB}`
+        );
+
+        status.textContent =
+            `${graph.union.length} images — `
+            + `${graph.intersection.length} shared `
+            + `between “${queryA}” and “${queryB}”.`;
+
+    } catch (error) {
+        console.error(
+            "CLIP intersection failed:",
+            error
+        );
+
+        status.textContent =
+            "Intersection failed. "
+            + "See the browser console.";
+
+    } finally {
+        if (button) {
+            button.disabled = false;
+        }
+    }
+}
+
+
+function refreshGraphFromControls() {
+    if (!currentGraphState) {
+        return;
+    }
+
+    const options =
+        currentGraphOptions();
+
+    const graph =
+        buildIntersectionGraph(
+            currentGraphState.queryA,
+            currentGraphState.queryB,
+            options
+        );
+
+    currentGraphState.options =
+        options;
+
+    currentGraphState.graph =
+        graph;
+
+    renderIntersectionGraph(
+        graph
+    );
+
+    updateGraphSummary(
+        graph,
+        options
+    );
+
+    renderResults(
+        graph.union,
+        `UNION / ${
+            currentGraphState.queryA.text
+        } ∩ ${
+            currentGraphState.queryB.text
+        }`
+    );
+}
+
+
+function scheduleGraphRefresh() {
+    if (graphRefreshTimeout) {
+        clearTimeout(
+            graphRefreshTimeout
+        );
+    }
+
+    graphRefreshTimeout = setTimeout(
+        refreshGraphFromControls,
+        120
+    );
 }
 
 

@@ -2878,6 +2878,7 @@ Search mode
 <select id="semantic-mode">
 <option value="text">Text description</option>
 <option value="image">Image example</option>
+<option value="graph">Query intersection</option>
 </select>
 
 </label>
@@ -3003,6 +3004,82 @@ The selected image is processed locally in your browser.
 
 </div>
 
+<div
+    id="semantic-graph-panel"
+    class="semantic-query-panel"
+    hidden
+>
+
+<label class="semantic-query-control">
+Query A
+
+<div class="semantic-query-line">
+
+<input
+    id="semantic-query-a"
+    type="search"
+    placeholder="church"
+    value="church"
+/>
+
+</div>
+
+</label>
+
+<label class="semantic-query-control">
+Query B
+
+<div class="semantic-query-line">
+
+<input
+    id="semantic-query-b"
+    type="search"
+    placeholder="cathedral"
+    value="cathedral"
+/>
+
+</div>
+
+</label>
+
+<button
+    id="semantic-graph-search-button"
+    type="button"
+>
+Find intersection
+</button>
+
+<div class="semantic-graph-controls">
+
+<label>
+Results per query
+
+<select id="semantic-graph-limit">
+<option value="12">12</option>
+<option value="24" selected>24</option>
+<option value="48">48</option>
+<option value="96">96</option>
+<option value="192">192</option>
+</select>
+
+</label>
+
+<label class="semantic-graph-checkbox">
+
+<input
+    id="semantic-graph-show-query-links"
+    type="checkbox"
+    checked
+/>
+
+Show query links
+
+</label>
+
+</div>
+
+</div>
+
 <div class="semantic-controls">
 
 <label>
@@ -3032,7 +3109,9 @@ Minimum YOLO confidence
 
 </label>
 
-<label>
+<label
+    id="semantic-limit-control"
+>
 
 Results
 
@@ -3103,6 +3182,63 @@ The CLIP model is loaded only when a search is requested.
 </div>
 
 ## Row
+
+<div
+    id="semantic-graph-wrap"
+    class="semantic-graph-wrap"
+    hidden
+>
+
+<div class="semantic-graph-header">
+
+<span
+    id="semantic-graph-summary"
+    class="semantic-graph-summary"
+></span>
+
+</div>
+
+<div class="semantic-graph-legend">
+
+<span class="semantic-graph-legend-item semantic-graph-legend-query-a">
+Query A
+</span>
+
+<span class="semantic-graph-legend-item semantic-graph-legend-query-b">
+Query B
+</span>
+
+<span class="semantic-graph-legend-item semantic-graph-legend-intersection">
+Shared by both
+</span>
+
+<span class="semantic-graph-legend-item semantic-graph-legend-only-a">
+Only in A
+</span>
+
+<span class="semantic-graph-legend-item semantic-graph-legend-only-b">
+Only in B
+</span>
+
+</div>
+
+<div class="semantic-graph-container">
+
+<svg
+    id="semantic-graph"
+    viewBox="0 0 1000 620"
+    role="img"
+    aria-label="Query intersection graph"
+></svg>
+
+<div
+    id="semantic-graph-tooltip"
+    class="semantic-graph-tooltip"
+></div>
+
+</div>
+
+</div>
 
 <div
     id="semantic-results"
@@ -3418,6 +3554,16 @@ Image and query vectors are L2-normalized and ranked through cosine
 similarity. The search covers
 <strong>{semantic_indexed_items:,} public images</strong>, rather
 than the complete private research collection.
+</p>
+
+<p>
+The <strong>query intersection</strong> mode encodes two independent
+text queries and returns the union of the images ranked by both. Shared
+results are highlighted, so you can see at a glance which images appear
+in both queries and which are unique to each. Results are rendered as a
+force-directed graph: each node is an image thumbnail, the two query
+hubs connect to the images they retrieve, and nodes retrieved by both
+queries are emphasised.
 </p>
 
 </section>
