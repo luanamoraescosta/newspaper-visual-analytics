@@ -1,2 +1,5 @@
 /.quarto/
 **/*.quarto_ipynb
+*.quarto_ipynb_*
+*.bak_*
+opencode.json
