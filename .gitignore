@@ -3,3 +3,6 @@
 *.quarto_ipynb_*
 *.bak_*
 opencode.json
+__pycache__/
+*.pyc
+ocr_run.log

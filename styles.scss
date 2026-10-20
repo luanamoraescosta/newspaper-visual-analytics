@@ -1600,6 +1600,34 @@ input[type="checkbox"] {
     font-size: 0.72rem;
 }
 
+.ocr-block {
+    padding: 0.7rem;
+
+    border-top: var(--border);
+
+    background: var(--paper-light);
+}
+
+.ocr-block h4 {
+    margin: 0 0 0.4rem;
+
+    color: var(--muted);
+
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.ocr-block p {
+    margin: 0;
+
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+
+    font-size: 0.78rem;
+    line-height: 1.5;
+}
+
 .source-link {
     display: inline-block;
 

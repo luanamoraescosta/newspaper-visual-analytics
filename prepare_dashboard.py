@@ -78,6 +78,20 @@ CROP_WEBP_QUALITY = 76
 PAGE_THUMBNAIL_SIZE = (800, 1200)
 PAGE_WEBP_QUALITY = 65
 
+# Cache de texto OCR (id -> texto) gerado por ocr_crops.py.
+OCR_CACHE_PATH = Path("ocr_text_cache.json")
+
+
+def carregar_cache_ocr(caminho=OCR_CACHE_PATH):
+    if caminho and caminho.exists():
+        try:
+            return json.loads(
+                caminho.read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError):
+            return {}
+    return {}
+
 
 # ============================================================
 # ARGUMENTOS
@@ -1033,6 +1047,8 @@ def preparar_galeria(
 ):
     gallery = []
 
+    ocr_cache = carregar_cache_ocr()
+
     # Armazena o resultado da geração de cada preview para evitar
     # abrir e converter a mesma página várias vezes.
     preview_cache = {}
@@ -1258,6 +1274,12 @@ def preparar_galeria(
                     preview_key
                 )
                 else None
+            ),
+            "ocr_text": (
+                ocr_cache.get(
+                    detection_id,
+                    "",
+                )
             ),
         })
 

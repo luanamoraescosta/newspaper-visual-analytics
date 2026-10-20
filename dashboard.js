@@ -92,6 +92,16 @@ function initializeGallery(originalData) {
         "gallery-search"
     );
 
+    if (searchInput) {
+        searchInput.hidden = false;
+        searchInput.placeholder =
+            "Search text / OCR...";
+        searchInput.setAttribute(
+            "aria-label",
+            "Search visual elements by text"
+        );
+    }
+
     const classSelect = document.getElementById(
         "gallery-class"
     );
@@ -181,7 +191,8 @@ function initializeGallery(originalData) {
                     item.page,
                     item.issue,
                     item.bib,
-                    item.class
+                    item.class,
+                    item.ocr_text
                 ]
                     .join(" ")
                     .toLowerCase();
@@ -368,6 +379,21 @@ function initializeGallery(originalData) {
                         </code>
                     </dd>
                 </dl>
+
+                ${
+                    item.ocr_text
+                    ? `
+                        <div class="ocr-block">
+                            <h4>Recognised text (OCR)</h4>
+                            <p>
+                            ${escapeHtml(
+                                item.ocr_text
+                            )}
+                            </p>
+                        </div>
+                    `
+                    : ""
+                }
 
                 ${
                     item.url
